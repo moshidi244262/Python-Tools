@@ -157,7 +157,7 @@
                 desc: '一键提取MP4等视频文件中的音频流，输出为高品质MP3/WAV格式，自媒体创作者必备。',
                 tags: ['FFmpeg', '媒体流'],
                 sourceFolder: '视频转音频',
-                mainFile: 'vedio-audio'
+                mainFile: 'vedio-audio.py'
             },
             {
                 id: 'audio-compress',
@@ -211,8 +211,14 @@
             const encodedFile = encodeURIComponent(tool.mainFile);
             
             const sourceUrl = `${REPO_BASE}/${encodedFolder}`;
-            // 默认下载链接指向对应的 Python 脚本源文件
+            // 默认下载链接指向对应的文件 raw 地址
             const downloadUrl = `${DOWNLOAD_BASE}/${encodedFolder}/${encodedFile}`;
+
+            // 智能判断是 EXE 还是 脚本文件
+            const isExe = tool.mainFile.toLowerCase().endsWith('.exe');
+            const downloadBtnText = isExe ? '下载 EXE (免安装)' : '下载源码脚本';
+            const downloadBtnColor = isExe ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/50';
+            const downloadIcon = isExe ? 'fa-window-maximize' : 'fa-download';
 
             // 创建卡片元素
             const card = document.createElement('div');
@@ -240,13 +246,13 @@
                 </div>
                 
                 <div class="mt-auto z-10 flex gap-3">
-                    <a href="${sourceUrl}" target="_blank" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors border border-slate-600 flex items-center justify-center space-x-2">
+                    <a href="${sourceUrl}" target="_blank" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors border border-slate-600 flex items-center justify-center space-x-2 text-sm">
                         <i class="fa-solid fa-code"></i>
-                        <span>源码</span>
+                        <span>源码目录</span>
                     </a>
-                    <a href="${downloadUrl}" target="_blank" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-lg shadow-blue-900/50 flex items-center justify-center space-x-2">
-                        <i class="fa-solid fa-download"></i>
-                        <span>下载脚本</span>
+                    <a href="${downloadUrl}" target="_blank" class="flex-1 ${downloadBtnColor} text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-lg flex items-center justify-center space-x-2 text-sm">
+                        <i class="fa-solid ${downloadIcon}"></i>
+                        <span>${downloadBtnText}</span>
                     </a>
                 </div>
             `;
