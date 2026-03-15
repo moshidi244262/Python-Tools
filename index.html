@@ -51,17 +51,6 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
-        
-        /* 弹窗样式 */
-        #toast {
-            visibility: hidden;
-            opacity: 0;
-            transition: visibility 0s, opacity 0.3s linear;
-        }
-        #toast.show {
-            visibility: visible;
-            opacity: 1;
-        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-purple-500 selection:text-white">
@@ -75,16 +64,17 @@
                     <span class="font-bold text-xl tracking-tight">Tools<span class="gradient-text">Hub</span></span>
                 </div>
                 <div>
-                    <a href="https://github.com/yourusername" target="_blank" class="text-slate-300 hover:text-white transition-colors flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-full text-sm font-medium border border-slate-600">
+                    <!-- 更新了顶部 GitHub 个人主页链接 -->
+                    <a href="https://github.com/moshidi244262/Python-Tools" target="_blank" class="text-slate-300 hover:text-white transition-colors flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-full text-sm font-medium border border-slate-600">
                         <i class="fa-brands fa-github"></i>
-                        <span>查看源码</span>
+                        <span>查看项目仓库</span>
                     </a>
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- 头部英雄区 (Hero Section) -->
+    <!-- 头部英雄区 -->
     <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full">
         <div class="text-center max-w-3xl mx-auto mb-16">
             <h1 class="text-4xl md:text-5xl font-extrabold mb-6 tracking-tight">
@@ -109,24 +99,20 @@
     <!-- 页脚 -->
     <footer class="border-t border-slate-800 bg-slate-900/50 py-8 mt-auto">
         <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
-            <p class="text-slate-500 text-sm">© 2024 Your Name. 毕业求职作品集.</p>
+            <p class="text-slate-500 text-sm">© 2024 moshidi244262. 毕业求职作品集.</p>
             <div class="flex space-x-4 mt-4 md:mt-0 text-slate-400">
-                <a href="#" class="hover:text-white transition"><i class="fa-solid fa-envelope"></i></a>
-                <a href="#" class="hover:text-white transition"><i class="fa-brands fa-github"></i></a>
-                <a href="#" class="hover:text-white transition"><i class="fa-brands fa-linkedin"></i></a>
+                <a href="https://github.com/moshidi244262" target="_blank" class="hover:text-white transition"><i class="fa-brands fa-github"></i></a>
             </div>
         </div>
     </footer>
 
-    <!-- 自定义弹窗 (Toast) -->
-    <div id="toast" class="fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-600 text-white px-6 py-3 rounded-full shadow-2xl z-50 flex items-center space-x-3">
-        <i class="fa-solid fa-circle-info text-blue-400"></i>
-        <span id="toast-message">操作成功</span>
-    </div>
-
     <!-- 交互逻辑 -->
     <script>
-        // 工具数据列表 (对应你截图中的文件夹)
+        // 基础 GitHub 仓库路径
+        const REPO_BASE = "https://github.com/moshidi244262/Python-Tools/tree/main";
+        // 如果你将来把打包好的 exe 传到了 Releases，可以改这里
+        const DOWNLOAD_BASE = "https://github.com/moshidi244262/Python-Tools/raw/main";
+
         const toolsData = [
             {
                 id: 'gif-compress',
@@ -134,7 +120,8 @@
                 icon: 'fa-solid fa-file-image text-pink-400',
                 desc: '智能压缩GIF图片体积。支持批量拖拽，全局/自定义压缩比率调节，自动保留动画帧结构。基于 Pillow 库开发。',
                 tags: ['Pillow', '多线程', '批量处理'],
-                action: '查看详情'
+                sourceFolder: 'Gif图压缩', // 对应你 Github 上的文件夹名称
+                mainFile: 'Gif-yasuo.py'   // 对应你 Github 上的主要代码或exe文件名
             },
             {
                 id: 'tavern-json',
@@ -142,7 +129,8 @@
                 icon: 'fa-solid fa-masks-theater text-purple-400',
                 desc: '将包含角色信息的PNG/WEBP角色卡图，通过Base64解码快速提取并转换为结构化的JSON格式数据。',
                 tags: ['正则解析', 'Base64解码', 'JSON构建'],
-                action: '查看详情'
+                sourceFolder: '酒馆角色卡转JSON',
+                mainFile: 'JSON-jiuguan.py'
             },
             {
                 id: 'img-compress',
@@ -150,7 +138,8 @@
                 icon: 'fa-regular fa-image text-blue-400',
                 desc: '高效的图片格式转换与体积压缩工具，自动保持图片画质，极大节省磁盘空间。',
                 tags: ['图像处理', '自动化'],
-                action: '查看详情'
+                sourceFolder: '图片压缩',
+                mainFile: 'main.py' // 替换为真实文件名
             },
             {
                 id: 'audio-text',
@@ -158,7 +147,8 @@
                 icon: 'fa-solid fa-microphone-lines text-emerald-400',
                 desc: '结合语音识别模型，将本地音频文件快速提取为文稿内容，支持长语音分段处理。',
                 tags: ['语音识别', 'AI应用'],
-                action: '查看详情'
+                sourceFolder: '音频转文本',
+                mainFile: 'main.py'
             },
             {
                 id: 'video-audio',
@@ -166,7 +156,8 @@
                 icon: 'fa-solid fa-photo-film text-orange-400',
                 desc: '一键提取MP4等视频文件中的音频流，输出为高品质MP3/WAV格式，自媒体创作者必备。',
                 tags: ['FFmpeg', '媒体流'],
-                action: '查看详情'
+                sourceFolder: '视频转音频',
+                mainFile: 'main.py'
             },
             {
                 id: 'audio-compress',
@@ -174,7 +165,8 @@
                 icon: 'fa-solid fa-file-audio text-yellow-400',
                 desc: '在尽量不损失人耳听觉质量的前提下，通过降低比特率等方式大幅压缩音频文件大小。',
                 tags: ['音频编码', '批量化'],
-                action: '查看详情'
+                sourceFolder: '音频压缩',
+                mainFile: 'main.py'
             },
             {
                 id: 'music-tag',
@@ -182,7 +174,8 @@
                 icon: 'fa-solid fa-compact-disc text-teal-400',
                 desc: '快速清除MP3等音乐文件中的广告标签、乱码元数据，还你一个干净的音乐库。',
                 tags: ['ID3解析', '元数据修改'],
-                action: '查看详情'
+                sourceFolder: '音乐标签去除工具',
+                mainFile: 'main.py'
             },
             {
                 id: 'file-md',
@@ -190,7 +183,8 @@
                 icon: 'fa-brands fa-markdown text-sky-400',
                 desc: '支持将文档、代码文件快速格式化为 Markdown 语法格式，便于博客编写与知识库沉淀。',
                 tags: ['文本处理', '格式化'],
-                action: '查看详情'
+                sourceFolder: '文件转.md',
+                mainFile: 'main.py'
             },
             {
                 id: 'video-compress',
@@ -198,7 +192,8 @@
                 icon: 'fa-solid fa-video text-rose-400',
                 desc: '利用先进的H.264/H.265编码技术，在保证画质的前提下，将庞大的视频文件体积缩减。',
                 tags: ['视频编码', 'FFmpeg封装'],
-                action: '查看详情'
+                sourceFolder: '视频压缩',
+                mainFile: 'main.py'
             }
         ];
 
@@ -210,6 +205,14 @@
             const tagsHtml = tool.tags.map(tag => 
                 `<span class="px-2 py-1 text-xs rounded bg-slate-800 text-slate-300 border border-slate-700">${tag}</span>`
             ).join('');
+
+            // 拼接 Github 真实链接 (对中文文件夹名称进行 URI 编码)
+            const encodedFolder = encodeURIComponent(tool.sourceFolder);
+            const encodedFile = encodeURIComponent(tool.mainFile);
+            
+            const sourceUrl = `${REPO_BASE}/${encodedFolder}`;
+            // 默认下载链接指向对应的 Python 脚本源文件
+            const downloadUrl = `${DOWNLOAD_BASE}/${encodedFolder}/${encodedFile}`;
 
             // 创建卡片元素
             const card = document.createElement('div');
@@ -237,34 +240,19 @@
                 </div>
                 
                 <div class="mt-auto z-10 flex gap-3">
-                    <button onclick="showToast('正在为您跳转到 GitHub 源码仓库...')" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors border border-slate-600 flex items-center justify-center space-x-2">
+                    <a href="${sourceUrl}" target="_blank" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors border border-slate-600 flex items-center justify-center space-x-2">
                         <i class="fa-solid fa-code"></i>
                         <span>源码</span>
-                    </button>
-                    <button onclick="showToast('正在下载 ${tool.title} 的可执行文件...')" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-lg shadow-blue-900/50 flex items-center justify-center space-x-2">
+                    </a>
+                    <a href="${downloadUrl}" target="_blank" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-lg shadow-blue-900/50 flex items-center justify-center space-x-2">
                         <i class="fa-solid fa-download"></i>
-                        <span>下载工具</span>
-                    </button>
+                        <span>下载脚本</span>
+                    </a>
                 </div>
             `;
             
             grid.appendChild(card);
         });
-
-        // 弹窗逻辑
-        let toastTimeout;
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            const msgEl = document.getElementById('toast-message');
-            
-            msgEl.textContent = message;
-            toast.classList.add('show');
-            
-            clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
     </script>
 </body>
 </html>
