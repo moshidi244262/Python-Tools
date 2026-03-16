@@ -19,8 +19,8 @@
 
 ## 🚀 工具列表
 
-| 工具名称 | 图标 | 核心功能 | 技术栈 |
-| :--- | :---: | :--- | :--- |
+| 工具名称  | 核心功能 | 技术栈 |
+| :--- | :--- | :--- |
 | **🎤 音视频转文本** | <i class="fa-solid fa-microphone-lines"></i> | 基于 Whisper 的本地智能转录，支持视频/音频批量处理 | Whisper, PyTorch, tkinterdnd2 |
 | **🖼️ GIF 压缩工具** | <i class="fa-solid fa-file-image"></i> | 多线程 GIF 动图压缩，保留动画质量 | Pillow, TkinterDnD, 多线程 |
 | **🎭 角色卡提取工具** | <i class="fa-solid fa-masks-theater"></i> | 解析酒馆角色卡图片，提取结构化 JSON 数据 | Pillow, Base64解码, 正则扫描 |
@@ -33,6 +33,14 @@
 
 ---
 
+## 🖼️ 图片展示
+> **提示**：为获得最佳浏览体验，所有工具的界面截图、操作演示和效果对比图均已集成到在线演示网站中。
+### 📱 查看方式
+1. **访问在线演示网站**：[https://moshidi244262.github.io/Python-Tools/](https://moshidi244262.github.io/Python-Tools/)
+2. **点击任意工具的"详细介绍"按钮**
+3. **在弹出窗口中查看"界面预览"部分**
+4. **支持点击图片全屏查看高清大图**
+---
 ## ✨ 核心特性
 
 ### 🎯 **用户体验优先**
