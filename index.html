@@ -51,12 +51,27 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+        /* 模态框滚动条美化 */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.3);
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.5);
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-purple-500 selection:text-white">
 
     <!-- 顶部导航栏 -->
-    <nav class="sticky top-0 z-50 backdrop-blur-md bg-slate-900/50 border-b border-slate-700/50">
+    <nav class="sticky top-0 z-40 backdrop-blur-md bg-slate-900/50 border-b border-slate-700/50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center space-x-3">
@@ -64,7 +79,6 @@
                     <span class="font-bold text-xl tracking-tight">Tools<span class="gradient-text">Hub</span></span>
                 </div>
                 <div>
-                    <!-- 更新了顶部 GitHub 个人主页链接 -->
                     <a href="https://github.com/moshidi244262/Python-Tools" target="_blank" class="text-slate-300 hover:text-white transition-colors flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-full text-sm font-medium border border-slate-600">
                         <i class="fa-brands fa-github"></i>
                         <span>查看项目仓库</span>
@@ -83,7 +97,7 @@
             <p class="text-lg md:text-xl text-slate-400 leading-relaxed mb-8">
                 这里收集了我个人独立开发的一系列自动化脚本与桌面端工具，涵盖音视频处理、图片压缩、文本解析等日常需求。纯粹出于热爱，打造极致的效率体验。
             </p>
-            <div class="flex justify-center space-x-4">
+            <div class="flex flex-wrap justify-center gap-4">
                 <span class="px-4 py-1.5 rounded-full bg-blue-900/30 text-blue-300 border border-blue-800/50 text-sm"><i class="fa-solid fa-code mr-2"></i>Python 3</span>
                 <span class="px-4 py-1.5 rounded-full bg-purple-900/30 text-purple-300 border border-purple-800/50 text-sm"><i class="fa-solid fa-window-maximize mr-2"></i>Tkinter GUI</span>
                 <span class="px-4 py-1.5 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-800/50 text-sm"><i class="fa-solid fa-bolt mr-2"></i>开箱即用</span>
@@ -106,6 +120,36 @@
         </div>
     </footer>
 
+    <!-- 详细介绍模态框 (Modal) -->
+    <div id="detail-modal" class="fixed inset-0 z-50 hidden items-center justify-center px-4">
+        <!-- 半透明黑底遮罩 -->
+        <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
+        
+        <!-- 弹窗主体内容 -->
+        <div class="relative w-full max-w-2xl bg-slate-800/90 backdrop-blur-xl border border-slate-600/80 rounded-2xl shadow-2xl transform scale-95 opacity-0 transition-all duration-300 max-h-[90vh] flex flex-col" id="modal-content">
+            
+            <!-- 右上角关闭按钮 -->
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white bg-slate-700/50 hover:bg-slate-600 rounded-full w-8 h-8 flex items-center justify-center transition-all z-10">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            
+            <!-- 弹窗内部可滚动区域 -->
+            <div class="p-6 sm:p-8 overflow-y-auto custom-scrollbar" id="modal-body">
+                <!-- 内容由JS动态注入 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 全屏图片预览 (Lightbox) 模态框 -->
+    <div id="lightbox-modal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-slate-950/95 backdrop-blur-md transition-opacity duration-300 opacity-0" onclick="closeLightbox()">
+        <!-- 关闭按钮 -->
+        <button class="absolute top-4 right-4 sm:top-6 sm:right-6 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-700 rounded-full w-10 h-10 flex items-center justify-center transition-all z-10" onclick="closeLightbox(); event.stopPropagation();">
+            <i class="fa-solid fa-xmark text-xl"></i>
+        </button>
+        <!-- 图片主体 (尽可能占满屏幕) -->
+        <img id="lightbox-img" src="" class="max-w-[95vw] max-h-[95vh] object-contain rounded-lg shadow-2xl transform scale-95 transition-transform duration-300" onclick="event.stopPropagation()">
+    </div>
+
     <!-- 交互逻辑 -->
     <script>
         // 基础 GitHub 仓库路径
@@ -113,21 +157,38 @@
         // 如果你将来把打包好的 exe 传到了 Releases，可以改这里
         const DOWNLOAD_BASE = "https://github.com/moshidi244262/Python-Tools/raw/main";
 
+        // 工具数据字典 (已添加 longDesc 和 features 以供详情页展示)
         const toolsData = [
             {
                 id: 'gif-compress',
                 title: 'GIF 图压缩工具 v1.1',
                 icon: 'fa-solid fa-file-image text-pink-400',
                 desc: '智能压缩GIF图片体积。支持批量拖拽，全局/自定义压缩比率调节，自动保留动画帧结构。基于 Pillow 库开发。',
+                longDesc: '这是一款基于 Python 和 Pillow 图像处理库开发的轻量级桌面端 GIF 压缩工具。主要解决日常中表情包、网页动图过大无法上传平台的问题。它通过智能减少颜色表和抽帧技术，在肉眼几乎看不出画质损失的情况下，将文件体积缩减到极致。',
+                imageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80', // 示例图片，请替换为你的七牛云链接
+                features: [
+                    '支持鼠标拖拽批量导入文件',
+                    '提供全局统一压缩率和单文件独立调节',
+                    '完美保留原始 GIF 的动画结构和延迟时间',
+                    '直观的转换进度条与本地日志记录'
+                ],
                 tags: ['Pillow', '多线程', '批量处理'],
-                sourceFolder: 'Gif图压缩', // 对应你 Github 上的文件夹名称
-                mainFile: 'Gif-yasuo.py'   // 对应你 Github 上的主要代码或exe文件名
+                sourceFolder: 'Gif图压缩',
+                mainFile: 'Gif-yasuo.py'
             },
             {
                 id: 'tavern-json',
                 title: '酒馆角色卡转 JSON v2.0',
                 icon: 'fa-solid fa-masks-theater text-purple-400',
                 desc: '将包含角色信息的PNG/WEBP角色卡图，通过Base64解码快速提取并转换为结构化的JSON格式数据。',
+                longDesc: '专门为 AI 角色扮演爱好者（酒馆/Tavern 用户）开发的解析工具。在 AI 社区中，角色设定往往被隐写在图片文件的EXIF或附属数据中。本工具能够深入解析图片二进制流，将其中的设定数据完整提取，并转换为前端或其它引擎容易读取的标准 JSON 配置格式。',
+                imageUrl: '', // 将后续上传好的七牛云图片链接粘贴到这里
+                features: [
+                    '支持 PNG 和 WEBP 两种主流角色卡格式',
+                    '自动定位并解码 Base64 隐写数据',
+                    '输出标准的结构化 JSON，支持嵌套字段',
+                    '界面清爽，支持一键清空和格式化展示'
+                ],
                 tags: ['正则解析', 'Base64解码', 'JSON构建'],
                 sourceFolder: '酒馆角色卡转JSON',
                 mainFile: 'JSON-jiuguan.py'
@@ -137,15 +198,19 @@
                 title: '图片压缩小工具',
                 icon: 'fa-regular fa-image text-blue-400',
                 desc: '高效的图片格式转换与体积压缩工具，自动保持图片画质，极大节省磁盘空间。',
+                longDesc: '摄影师和前端开发者的福音。采用先进的图像缩放算法与质量压缩比率算法，能够在保留图片原有分辨率或等比例缩放的前提下，大幅削减 JPG/PNG 等静态图片的存储体积。',
+                features: ['支持 JPG, PNG, WEBP 多格式互转', '自定义图像质量(0-100)', '保留 EXIF 信息开关', '极速处理引擎，百张图片秒级压缩'],
                 tags: ['图像处理', '自动化'],
                 sourceFolder: '图片压缩',
-                mainFile: 'comperss-p.py' // 替换为真实文件名
+                mainFile: 'comperss-p.py'
             },
             {
                 id: 'audio-text',
                 title: '音频转文本 (STT)',
                 icon: 'fa-solid fa-microphone-lines text-emerald-400',
                 desc: '结合语音识别模型，将本地音频文件快速提取为文稿内容，支持长语音分段处理。',
+                longDesc: '告别手动听打！该工具集成了优秀的语音识别技术，可以离线或调用API将会议录音、采访录音转化为带有标点符号的纯文本。内建了静音分段逻辑，能够稳定处理长达数小时的超大音频文件，不会因为内存溢出而崩溃。',
+                features: ['智能断句与标点符号自动推断', '超长音频自动切片识别', '支持 MP3, WAV, M4A 常见格式', '导出为 TXT 或 Markdown 格式'],
                 tags: ['语音识别', 'AI应用'],
                 sourceFolder: '音频转文本',
                 mainFile: 'audio-to-txt.py'
@@ -155,15 +220,19 @@
                 title: '视频转音频提取器',
                 icon: 'fa-solid fa-photo-film text-orange-400',
                 desc: '一键提取MP4等视频文件中的音频流，输出为高品质MP3/WAV格式，自媒体创作者必备。',
+                longDesc: '底层调用了强大的 FFmpeg 引擎。这个小巧的工具专注于做一件事：以最快的速度将视频容器中的音轨无损剥离出来，或者重新编码为您需要的音频格式。',
+                features: ['极速模式（不重编码直接提取音频流）', '自定义输出比特率 (128kbps~320kbps)', '支持批量文件夹扫描提取', '多音轨视频的音轨选择支持'],
                 tags: ['FFmpeg', '媒体流'],
                 sourceFolder: '视频转音频',
-                mainFile: 'vedio-audio.py'
+                mainFile: 'vedio-audio'
             },
             {
                 id: 'audio-compress',
                 title: '音频压缩瘦身',
                 icon: 'fa-solid fa-file-audio text-yellow-400',
                 desc: '在尽量不损失人耳听觉质量的前提下，通过降低比特率等方式大幅压缩音频文件大小。',
+                longDesc: '随着高解析度音频的普及，手机或播放器的存储空间经常告急。本工具通过重采样和智能比特率控制（VBR/CBR），可以在体积与音质之间找到完美的平衡点，非常适合制作适用于网页加载的轻量级音频。',
+                features: ['自定义采样率 (44100Hz, 48000Hz等)', '支持单声道与双声道转换', '多线程并发压缩', '体积减小率预估'],
                 tags: ['音频编码', '批量化'],
                 sourceFolder: '音频压缩',
                 mainFile: 'audio-comperss.py'
@@ -173,6 +242,8 @@
                 title: '音乐标签去除工具',
                 icon: 'fa-solid fa-compact-disc text-teal-400',
                 desc: '快速清除MP3等音乐文件中的广告标签、乱码元数据，还你一个干净的音乐库。',
+                longDesc: '网上下载的音乐经常附带着某某论坛的网址、不相关的专辑封面或乱码的歌手名。这个脚本利用 mutagen 库深入解析音频文件的 ID3 标签，支持一键清空所有非必要元数据，或者根据正则表达式批量修改标签，强迫症患者的福音。',
+                features: ['彻底擦除 ID3v1/ID3v2, APEv2 标签', '支持移除内嵌的无用专辑封面', '重置标题、艺术家、专辑字段', '安全模式：修改前自动备份'],
                 tags: ['ID3解析', '元数据修改'],
                 sourceFolder: '音乐标签去除工具',
                 mainFile: 'audio-label.py'
@@ -182,6 +253,8 @@
                 title: '文件转 .md 工具',
                 icon: 'fa-brands fa-markdown text-sky-400',
                 desc: '支持将文档、代码文件快速格式化为 Markdown 语法格式，便于博客编写与知识库沉淀。',
+                longDesc: '为了方便将本地的散落笔记、代码片段整理进 Obsidian 或 Hexo 博客，我编写了这个转化器。它可以读取多种纯文本格式，自动提取标题层级和代码块，并将其包装为标准且美观的 Markdown 文件。',
+                features: ['支持自动识别代码语言并添加代码块反引号', '可根据空行智能生成段落', '合并多个小文件为一个长 MD 文件', '生成清晰的文件目录树 (TOC)'],
                 tags: ['文本处理', '格式化'],
                 sourceFolder: '文件转.md',
                 mainFile: 'file-md.py'
@@ -191,47 +264,44 @@
                 title: '视频无损压缩',
                 icon: 'fa-solid fa-video text-rose-400',
                 desc: '利用先进的H.264/H.265编码技术，在保证画质的前提下，将庞大的视频文件体积缩减。',
+                longDesc: '由于原始录屏或手机拍摄的视频码率极高，不便于网络传输。这个带界面的工具封装了复杂的 FFmpeg 参数，通过控制 CRF（固定质量参数）和预设（Preset），让你只需拖动滑块就能实现视频的高效压缩。',
+                features: ['支持 H.264 与效率更高的 H.265 (HEVC) 编码', '基于 CRF 的智能画质控制', '支持硬件加速 (NVIDIA NVENC/AMD AMF)', '压制进度实时预览与预估剩余时间'],
                 tags: ['视频编码', 'FFmpeg封装'],
                 sourceFolder: '视频压缩',
                 mainFile: 'vedio-compress.py'
             }
         ];
 
-        // 渲染卡片
         const grid = document.getElementById('tools-grid');
         
+        // 渲染主页卡片
         toolsData.forEach(tool => {
-            // 生成标签HTML
             const tagsHtml = tool.tags.map(tag => 
                 `<span class="px-2 py-1 text-xs rounded bg-slate-800 text-slate-300 border border-slate-700">${tag}</span>`
             ).join('');
 
-            // 拼接 Github 真实链接 (对中文文件夹名称进行 URI 编码)
             const encodedFolder = encodeURIComponent(tool.sourceFolder);
             const encodedFile = encodeURIComponent(tool.mainFile);
             
             const sourceUrl = `${REPO_BASE}/${encodedFolder}`;
-            // 默认下载链接指向对应的文件 raw 地址
             const downloadUrl = `${DOWNLOAD_BASE}/${encodedFolder}/${encodedFile}`;
 
-            // 智能判断是 EXE 还是 脚本文件
-            const isExe = tool.mainFile.toLowerCase().endsWith('.exe');
-            const downloadBtnText = isExe ? '下载 EXE (免安装)' : '下载源码脚本';
-            const downloadBtnColor = isExe ? 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-900/50' : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/50';
-            const downloadIcon = isExe ? 'fa-window-maximize' : 'fa-download';
-
-            // 创建卡片元素
             const card = document.createElement('div');
             card.className = 'glass-card rounded-2xl p-6 flex flex-col h-full relative overflow-hidden group';
             
-            // 添加背景光晕效果
+            // 背景光晕
             const glow = document.createElement('div');
             glow.className = 'absolute -right-10 -top-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl group-hover:bg-primary/20 transition duration-500';
             card.appendChild(glow);
 
             card.innerHTML += `
-                <div class="flex items-center space-x-4 mb-4 z-10">
-                    <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700">
+                <!-- 新增：详细介绍按钮 (绝对定位在右上角) -->
+                <button onclick="openModal('${tool.id}')" class="absolute top-4 right-4 z-20 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-800/80 text-blue-300 hover:bg-blue-600 hover:text-white border border-slate-600 transition-all duration-300 shadow-sm flex items-center group/btn">
+                    <i class="fa-solid fa-circle-info mr-1.5 group-hover/btn:rotate-12 transition-transform"></i>详细介绍
+                </button>
+
+                <div class="flex items-center space-x-4 mb-4 z-10 pr-24">
+                    <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0">
                         <i class="${tool.icon} text-2xl"></i>
                     </div>
                     <h3 class="text-xl font-bold text-slate-100">${tool.title}</h3>
@@ -246,19 +316,172 @@
                 </div>
                 
                 <div class="mt-auto z-10 flex gap-3">
-                    <a href="${sourceUrl}" target="_blank" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors border border-slate-600 flex items-center justify-center space-x-2 text-sm">
+                    <a href="${sourceUrl}" target="_blank" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors border border-slate-600 flex items-center justify-center space-x-2">
                         <i class="fa-solid fa-code"></i>
-                        <span>源码目录</span>
+                        <span>源码</span>
                     </a>
-                    <a href="${downloadUrl}" target="_blank" class="flex-1 ${downloadBtnColor} text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-lg flex items-center justify-center space-x-2 text-sm">
-                        <i class="fa-solid ${downloadIcon}"></i>
-                        <span>${downloadBtnText}</span>
+                    <a href="${downloadUrl}" target="_blank" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 px-4 rounded-lg transition-colors shadow-lg shadow-blue-900/50 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-download"></i>
+                        <span>下载</span>
                     </a>
                 </div>
             `;
             
             grid.appendChild(card);
         });
+
+        // 模态框逻辑
+        const modal = document.getElementById('detail-modal');
+        const modalContent = document.getElementById('modal-content');
+        const modalBody = document.getElementById('modal-body');
+
+        function openModal(toolId) {
+            const tool = toolsData.find(t => t.id === toolId);
+            if(!tool) return;
+
+            const tagsHtml = tool.tags.map(tag =>
+                `<span class="px-2.5 py-1 text-xs font-medium rounded-md bg-slate-700/50 text-slate-300 border border-slate-600 shadow-sm">${tag}</span>`
+            ).join('');
+
+            // 构建功能列表 HTML
+            let featuresHtml = '';
+            if (tool.features && tool.features.length > 0) {
+                featuresHtml = `
+                    <div class="mt-6">
+                        <h4 class="text-lg font-semibold text-white mb-3 flex items-center">
+                            <i class="fa-solid fa-wand-magic-sparkles text-yellow-400 mr-2"></i>核心特性
+                        </h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            ${tool.features.map(f => `
+                                <div class="flex items-start bg-slate-900/30 p-3 rounded-xl border border-slate-700/50">
+                                    <i class="fa-solid fa-check text-emerald-400 mt-1 mr-3 text-sm shrink-0"></i>
+                                    <span class="text-slate-300 text-sm leading-snug">${f}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 构建图片预览 HTML
+            let imageHtml = '';
+            if (tool.imageUrl) {
+                imageHtml = `
+                    <div class="mt-6">
+                        <h4 class="text-lg font-semibold text-white mb-3 flex items-center">
+                            <i class="fa-solid fa-image text-pink-400 mr-2"></i>界面预览
+                        </h4>
+                        <div class="relative group rounded-xl overflow-hidden border border-slate-700/50 cursor-pointer bg-slate-900/80 p-2" onclick="openLightbox('${tool.imageUrl}')">
+                            <img src="${tool.imageUrl}" alt="${tool.title} 截图" class="w-full h-48 sm:h-72 object-contain mx-auto transform group-hover:scale-105 transition-transform duration-500 rounded-lg">
+                            <div class="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
+                                <span class="bg-slate-800/90 text-white px-4 py-2 rounded-lg backdrop-blur-sm flex items-center shadow-lg"><i class="fa-solid fa-magnifying-glass-plus mr-2"></i>点击全屏查看大图</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const encodedFolder = encodeURIComponent(tool.sourceFolder);
+            const encodedFile = encodeURIComponent(tool.mainFile);
+            const sourceUrl = `${REPO_BASE}/${encodedFolder}`;
+            const downloadUrl = `${DOWNLOAD_BASE}/${encodedFolder}/${encodedFile}`;
+
+            // 填充模态框内容
+            modalBody.innerHTML = `
+                <!-- 头部 -->
+                <div class="flex items-start space-x-5 mb-6 pr-6 border-b border-slate-700/50 pb-6">
+                    <div class="w-16 h-16 rounded-2xl bg-slate-800 flex items-center justify-center border border-slate-600 shadow-inner shrink-0 mt-1">
+                        <i class="${tool.icon} text-3xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-2xl sm:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400 mb-2">${tool.title}</h3>
+                        <div class="flex flex-wrap gap-2">
+                            ${tagsHtml}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 简介内容 -->
+                <div>
+                    <h4 class="text-lg font-semibold text-white mb-3 flex items-center">
+                        <i class="fa-solid fa-book-open text-blue-400 mr-2"></i>工具详述
+                    </h4>
+                    <p class="text-slate-300 text-sm sm:text-base leading-relaxed bg-slate-900/50 p-4 sm:p-5 rounded-xl border border-slate-700/50">
+                        ${tool.longDesc || tool.desc}
+                    </p>
+                </div>
+
+                <!-- 工具图片预览 -->
+                ${imageHtml}
+
+                <!-- 功能特性 -->
+                ${featuresHtml}
+
+                <!-- 底部按钮 -->
+                <div class="mt-8 flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-700/50">
+                    <a href="${sourceUrl}" target="_blank" class="flex-1 px-5 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors border border-slate-500 flex items-center justify-center text-center">
+                        <i class="fa-brands fa-github mr-2"></i>去 GitHub 查看源码
+                    </a>
+                    <a href="${downloadUrl}" target="_blank" class="flex-1 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors shadow-lg shadow-blue-900/30 flex items-center justify-center text-center">
+                        <i class="fa-solid fa-download mr-2"></i>直接下载该工具脚本
+                    </a>
+                </div>
+            `;
+
+            // 显示并播放动画
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // 防止背景滚动
+            document.body.style.overflow = 'hidden'; 
+            
+            // 延迟一点点触发动画，让浏览器有时间处理 display 变化
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+                modalContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            // 先收起动画
+            modalContent.classList.remove('scale-100', 'opacity-100');
+            modalContent.classList.add('scale-95', 'opacity-0');
+            
+            // 动画结束后隐藏 DOM
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                document.body.style.overflow = ''; // 恢复滚动
+            }, 300); // 这里的 300 对应 duration-300
+        }
+
+        // --- 全屏图片预览 (Lightbox) 逻辑 ---
+        const lightboxModal = document.getElementById('lightbox-modal');
+        const lightboxImg = document.getElementById('lightbox-img');
+
+        function openLightbox(url) {
+            lightboxImg.src = url;
+            lightboxModal.classList.remove('hidden');
+            lightboxModal.classList.add('flex');
+            
+            // 延迟一点触发透明度动画，让浏览器渲染
+            setTimeout(() => {
+                lightboxModal.classList.remove('opacity-0');
+                lightboxImg.classList.remove('scale-95');
+                lightboxImg.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeLightbox() {
+            lightboxModal.classList.add('opacity-0');
+            lightboxImg.classList.remove('scale-100');
+            lightboxImg.classList.add('scale-95');
+            
+            setTimeout(() => {
+                lightboxModal.classList.add('hidden');
+                lightboxModal.classList.remove('flex');
+                lightboxImg.src = ''; // 清空图片
+            }, 300);
+        }
     </script>
 </body>
 </html>
