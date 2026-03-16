@@ -7,14 +7,11 @@ from tkinter import ttk, filedialog, messagebox
 from pathlib import Path
 import threading
 from datetime import datetime
-import re
 
 # ================= 依赖检测与导入 =================
-# 尝试导入 Pillow (如果未安装，弹出友好的窗口提示而不是直接闪退)
 try:
     from PIL import Image
 except ImportError:
-    # 创建一个隐藏的主窗口用于弹窗
     err_root = tk.Tk()
     err_root.withdraw()
     messagebox.showerror(
@@ -23,7 +20,6 @@ except ImportError:
     )
     sys.exit(1)
 
-# 尝试导入 tkinterdnd2 (拖拽功能)
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
     HAS_DND = True
@@ -34,75 +30,88 @@ except ImportError:
 class ImageCompressorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("图片压缩工具 v2.0 - 支持格式转换")
-        self.root.geometry("1150x780")
-        self.root.minsize(950, 650)
+        self.root.title("图片处理大师 v3.0 - 压缩/转换/缩放")
+        self.root.geometry("1200x800")
+        self.root.minsize(1000, 700)
         
+        # 全局字体设置 (让界面在 Windows 下更好看)
+        self.default_font = ("Microsoft YaHei", 9) if sys.platform == "win32" else ("sans-serif", 10)
+        self.root.option_add("*Font", self.default_font)
+
         # 数据存储
         self.image_data = {}
         self.item_counter = 0
         
         # 路径设置
         self.script_dir = Path(__file__).parent if "__file__" in dir() else Path.cwd()
-        self.output_dir = self.script_dir / "压缩图片"
+        self.output_dir_var = tk.StringVar(value=str(self.script_dir / "压缩输出"))
         
         # 支持的输入格式
         self.supported_formats = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.gif', '.ico'}
         
         # 构建界面
         self.setup_ui()
+        self.setup_styles()
         
         # 绑定拖拽
         if HAS_DND:
             self.setup_dnd()
+            
+    def setup_styles(self):
+        """配置更美观的 ttk 样式"""
+        style = ttk.Style()
+        try:
+            style.theme_use('clam')
+        except Exception:
+            pass
+            
+        style.configure("TButton", padding=5, font=self.default_font)
+        style.configure("TLabelframe", font=(self.default_font[0], 10, "bold"))
+        style.configure("TLabelframe.Label", foreground="#333333")
+        
+        # Treeview 样式
+        style.configure("Treeview", rowheight=28, font=self.default_font)
+        style.configure("Treeview.Heading", font=(self.default_font[0], 10, "bold"), background="#e1e1e1")
+        
+        # 定义 Treeview 的标签颜色
+        self.tree.tag_configure('odd', background='#F8F9FA')
+        self.tree.tag_configure('even', background='#FFFFFF')
+        self.tree.tag_configure('success', foreground='#28A745', background='#E8F5E9')
+        self.tree.tag_configure('error', foreground='#DC3545', background='#FFEBEE')
         
     def setup_ui(self):
         """构建用户界面"""
         # 主布局容器
         main_paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
-        main_paned.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_paned.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
         
-        # === 左侧：文件列表区域 ===
+        # ================= 左侧：文件列表区域 =================
         left_frame = ttk.Frame(main_paned)
         main_paned.add(left_frame, weight=3)
         
         # 工具栏
         toolbar = ttk.Frame(left_frame)
-        toolbar.pack(fill=tk.X, pady=(0, 5))
+        toolbar.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Button(toolbar, text="📁 选择文件", command=self.select_files, width=12).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="📂 选择文件夹", command=self.select_folder, width=12).pack(side=tk.LEFT, padx=2)
-        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
-        ttk.Button(toolbar, text="🗑 删除选中", command=self.delete_selected, width=10).pack(side=tk.LEFT, padx=2)
-        ttk.Button(toolbar, text="🧹 清空列表", command=self.clear_all, width=10).pack(side=tk.LEFT, padx=2)
-        
-        # 提示
-        tip = ttk.Label(left_frame, text="💡 提示：支持拖拽文件或文件夹到下方列表 | PNG转JPG/WebP可大幅减小体积", foreground="gray")
-        tip.pack(anchor=tk.W, pady=(0, 2))
+        ttk.Button(toolbar, text="📁 添加文件", command=self.select_files).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(toolbar, text="📂 添加文件夹", command=self.select_folder).pack(side=tk.LEFT, padx=5)
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        ttk.Button(toolbar, text="🗑 移除选中", command=self.delete_selected).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar, text="🧹 清空全部", command=self.clear_all).pack(side=tk.LEFT, padx=5)
         
         # 列表 Treeview
         tree_frame = ttk.Frame(left_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True)
         
-        cols = ("文件名", "原始大小", "输出格式", "压缩比率", "压缩后大小", "压缩率", "状态")
+        cols = ("文件名", "原始大小", "输出格式", "画质", "缩放比例", "处理后大小", "压缩率", "状态")
         self.tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="extended")
         
-        # 定义列
-        self.tree.heading("文件名", text="文件名")
-        self.tree.heading("原始大小", text="原始大小")
-        self.tree.heading("输出格式", text="输出格式")
-        self.tree.heading("压缩比率", text="质量/Q")
-        self.tree.heading("压缩后大小", text="压缩后大小")
-        self.tree.heading("压缩率", text="压缩率")
-        self.tree.heading("状态", text="状态")
-        
-        self.tree.column("文件名", width=220, anchor=tk.W)
-        self.tree.column("原始大小", width=85, anchor=tk.CENTER)
-        self.tree.column("输出格式", width=80, anchor=tk.CENTER)
-        self.tree.column("压缩比率", width=70, anchor=tk.CENTER)
-        self.tree.column("压缩后大小", width=90, anchor=tk.CENTER)
-        self.tree.column("压缩率", width=70, anchor=tk.CENTER)
-        self.tree.column("状态", width=80, anchor=tk.CENTER)
+        # 定义列宽和对齐
+        col_widths = [220, 80, 80, 60, 80, 90, 70, 80]
+        for col, width in zip(cols, col_widths):
+            self.tree.heading(col, text=col)
+            anchor = tk.W if col == "文件名" else tk.CENTER
+            self.tree.column(col, width=width, anchor=anchor)
         
         # 滚动条
         scroll_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
@@ -112,159 +121,120 @@ class ImageCompressorApp:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # 绑定事件
         self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
-        if HAS_DND:
-            self.tree.drop_target_register(DND_FILES)
+        
+        # 底部：输出目录选择
+        dir_frame = ttk.Frame(left_frame)
+        dir_frame.pack(fill=tk.X, pady=(10, 0))
+        ttk.Label(dir_frame, text="输出目录:").pack(side=tk.LEFT)
+        ttk.Entry(dir_frame, textvariable=self.output_dir_var, state='readonly').pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        ttk.Button(dir_frame, text="更改目录", command=self.change_output_dir).pack(side=tk.LEFT)
             
-        # === 右侧：设置面板 ===
-        right_frame = ttk.Frame(main_paned, width=300)
+        # ================= 右侧：设置面板 =================
+        right_frame = ttk.Frame(main_paned, width=320)
         main_paned.add(right_frame, weight=1)
         
-        # 1. 输出设置
-        output_settings = ttk.LabelFrame(right_frame, text="输出设置", padding=10)
-        output_settings.pack(fill=tk.X, pady=(0, 10))
+        # 1. 输出格式设置
+        fmt_frame = ttk.LabelFrame(right_frame, text="输出格式", padding=10)
+        fmt_frame.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Label(output_settings, text="输出格式:").pack(anchor=tk.W)
         self.output_format = tk.StringVar(value="保持原格式")
-        format_combo = ttk.Combobox(output_settings, textvariable=self.output_format, state="readonly")
-        format_combo['values'] = ("保持原格式", "JPEG (.jpg)", "WebP (.webp)", "PNG (.png)", "ICO (.ico)", "BMP (.bmp)")
-        format_combo.pack(fill=tk.X, pady=(2, 5))
-        format_combo.bind("<<ComboboxSelected>>", self.on_format_change)
+        format_combo = ttk.Combobox(fmt_frame, textvariable=self.output_format, state="readonly")
+        format_combo['values'] = ("保持原格式", "JPEG (.jpg)", "WebP (.webp)", "PNG (.png)", "ICO (.ico)")
+        format_combo.pack(fill=tk.X)
         
-        # 格式说明
-        self.format_hint = ttk.Label(output_settings, text="当前：智能保持原格式", foreground="gray", wraplength=250)
-        self.format_hint.pack(anchor=tk.W)
+        # 2. 压缩与尺寸参数
+        param_frame = ttk.LabelFrame(right_frame, text="压缩参数 (全局)", padding=10)
+        param_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # 2. 全局压缩设置
-        global_frame = ttk.LabelFrame(right_frame, text="全局压缩质量", padding=10)
-        global_frame.pack(fill=tk.X, pady=(0, 10))
+        # 画质
+        ttk.Label(param_frame, text="导出画质 (1-100%):", foreground="gray").pack(anchor=tk.W)
+        q_frame = ttk.Frame(param_frame)
+        q_frame.pack(fill=tk.X, pady=(0, 10))
+        self.global_quality = tk.IntVar(value=80)
+        ttk.Scale(q_frame, from_=1, to=100, variable=self.global_quality, command=lambda _: self.q_label.config(text=f"{self.global_quality.get()}%")).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.q_label = ttk.Label(q_frame, text="80%", width=4)
+        self.q_label.pack(side=tk.RIGHT, padx=(5, 0))
         
-        ttk.Label(global_frame, text="质量/压缩等级 (1%-99%):").pack(anchor=tk.W)
+        # 尺寸缩放
+        ttk.Label(param_frame, text="尺寸缩放 (分辨率 1-100%):", foreground="gray").pack(anchor=tk.W)
+        s_frame = ttk.Frame(param_frame)
+        s_frame.pack(fill=tk.X, pady=(0, 10))
+        self.global_scale_pct = tk.IntVar(value=100)
+        ttk.Scale(s_frame, from_=1, to=100, variable=self.global_scale_pct, command=lambda _: self.s_label.config(text=f"{self.global_scale_pct.get()}%")).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.s_label = ttk.Label(s_frame, text="100%", width=4)
+        self.s_label.pack(side=tk.RIGHT, padx=(5, 0))
+
+        ttk.Button(param_frame, text="⬇ 应用到所有图片", command=self.apply_global_settings).pack(fill=tk.X)
         
-        scale_frame = ttk.Frame(global_frame)
-        scale_frame.pack(fill=tk.X, pady=5)
-        
-        self.global_ratio = tk.IntVar(value=80)
-        self.global_scale = ttk.Scale(scale_frame, from_=1, to=99, variable=self.global_ratio, orient=tk.HORIZONTAL)
-        self.global_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
-        self.global_label = ttk.Label(scale_frame, text="80%", width=5, anchor=tk.CENTER)
-        self.global_label.pack(side=tk.RIGHT)
-        self.global_scale.configure(command=self.update_global_label)
-        
-        # 快捷按钮
-        quick_frame = ttk.Frame(global_frame)
-        quick_frame.pack(fill=tk.X, pady=5)
-        for r in [50, 70, 80, 90, 95]:
-            ttk.Button(quick_frame, text=f"{r}%", width=5,
-                       command=lambda val=r: self.set_global_ratio(val)).pack(side=tk.LEFT, padx=1)
-        
-        ttk.Button(global_frame, text="应用到所有图片", command=self.apply_global_settings).pack(fill=tk.X, pady=(5, 0))
-        
-        # 3. 自定义压缩设置
-        custom_frame = ttk.LabelFrame(right_frame, text="自定义设置 (选中图片)", padding=10)
+        # 3. 自定义设置 (单张)
+        custom_frame = ttk.LabelFrame(right_frame, text="独立设置 (选中项)", padding=10)
         custom_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # 自定义格式
-        ttk.Label(custom_frame, text="输出格式:").pack(anchor=tk.W)
-        self.custom_format = tk.StringVar(value="保持原格式")
-        self.custom_format_combo = ttk.Combobox(custom_frame, textvariable=self.custom_format, state="readonly")
-        self.custom_format_combo['values'] = ("保持原格式", "JPEG (.jpg)", "WebP (.webp)", "PNG (.png)", "ICO (.ico)", "BMP (.bmp)")
-        self.custom_format_combo.pack(fill=tk.X, pady=(2, 5))
+        self.custom_quality = tk.IntVar(value=80)
+        self.custom_scale_pct = tk.IntVar(value=100)
         
-        # 自定义质量
-        ttk.Label(custom_frame, text="压缩质量:").pack(anchor=tk.W)
-        custom_scale_frame = ttk.Frame(custom_frame)
-        custom_scale_frame.pack(fill=tk.X, pady=5)
+        c_q_frame = ttk.Frame(custom_frame)
+        c_q_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(c_q_frame, text="画质:").pack(side=tk.LEFT)
+        ttk.Scale(c_q_frame, from_=1, to=100, variable=self.custom_quality, command=lambda _: self.c_q_label.config(text=f"{self.custom_quality.get()}%")).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        self.c_q_label = ttk.Label(c_q_frame, text="80%", width=4)
+        self.c_q_label.pack(side=tk.RIGHT)
+
+        c_s_frame = ttk.Frame(custom_frame)
+        c_s_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(c_s_frame, text="缩放:").pack(side=tk.LEFT)
+        ttk.Scale(c_s_frame, from_=1, to=100, variable=self.custom_scale_pct, command=lambda _: self.c_s_label.config(text=f"{self.custom_scale_pct.get()}%")).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        self.c_s_label = ttk.Label(c_s_frame, text="100%", width=4)
+        self.c_s_label.pack(side=tk.RIGHT)
         
-        self.custom_ratio = tk.IntVar(value=80)
-        self.custom_scale = ttk.Scale(custom_scale_frame, from_=1, to=99, variable=self.custom_ratio, orient=tk.HORIZONTAL)
-        self.custom_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
-        self.custom_label = ttk.Label(custom_scale_frame, text="80%", width=5, anchor=tk.CENTER)
-        self.custom_label.pack(side=tk.RIGHT)
-        self.custom_scale.configure(command=self.update_custom_label)
-        
-        ttk.Button(custom_frame, text="应用到选中图片", command=self.apply_custom_settings).pack(fill=tk.X, pady=(5, 0))
-        
+        ttk.Button(custom_frame, text="✔ 应用到选中图片", command=self.apply_custom_settings).pack(fill=tk.X, pady=(5, 0))
+
         # 4. 操作区
-        action_frame = ttk.LabelFrame(right_frame, text="操作", padding=10)
-        action_frame.pack(fill=tk.X, pady=(0, 10))
+        action_frame = ttk.LabelFrame(right_frame, text="执行", padding=10)
+        action_frame.pack(fill=tk.X, expand=True, anchor=tk.N)
         
-        self.compress_btn = ttk.Button(action_frame, text="🚀 开始压缩", command=self.start_compress)
-        self.compress_btn.pack(fill=tk.X, pady=2)
+        self.compress_btn = tk.Button(action_frame, text="🚀 开始处理", font=("Microsoft YaHei", 12, "bold"), bg="#0078D7", fg="white", relief=tk.FLAT, cursor="hand2", command=self.start_compress)
+        self.compress_btn.pack(fill=tk.X, pady=5, ipady=5)
         
-        ttk.Button(action_frame, text="📂 打开输出目录", command=self.open_output_dir).pack(fill=tk.X, pady=2)
-        ttk.Button(action_frame, text="🗑 清空日志", command=self.clear_log).pack(fill=tk.X, pady=2)
+        ttk.Button(action_frame, text="📂 打开输出目录", command=self.open_output_dir).pack(fill=tk.X, pady=5)
         
-        # 统计
-        self.stats_var = tk.StringVar(value="共 0 张图片")
-        ttk.Label(action_frame, textvariable=self.stats_var).pack(anchor=tk.W, pady=(5, 0))
-        
-        # === 底部：日志和进度 ===
+        self.stats_var = tk.StringVar(value="等待添加文件...")
+        ttk.Label(action_frame, textvariable=self.stats_var, foreground="gray").pack(anchor=tk.CENTER, pady=(10, 0))
+
+        # ================= 底部：日志和进度 =================
         bottom_frame = ttk.Frame(self.root)
-        bottom_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        
-        log_label = ttk.LabelFrame(bottom_frame, text="运行日志", padding=5)
-        log_label.pack(fill=tk.X)
-        
-        self.log_text = tk.Text(log_label, height=5, state=tk.DISABLED, wrap=tk.WORD, font=("Consolas", 9))
-        log_scroll = ttk.Scrollbar(log_label, orient=tk.VERTICAL, command=self.log_text.yview)
-        self.log_text.configure(yscrollcommand=log_scroll.set)
-        self.log_text.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        log_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 进度条
-        prog_frame = ttk.Frame(self.root)
-        prog_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        bottom_frame.pack(fill=tk.X, padx=15, pady=(0, 15))
         
         self.progress_var = tk.DoubleVar(value=0)
-        self.progress_bar = ttk.Progressbar(prog_frame, variable=self.progress_var, maximum=100)
-        self.progress_bar.pack(fill=tk.X, side=tk.LEFT, expand=True)
-        self.progress_label = ttk.Label(prog_frame, text="")
-        self.progress_label.pack(side=tk.RIGHT, padx=(10, 0))
+        self.progress_bar = ttk.Progressbar(bottom_frame, variable=self.progress_var, maximum=100)
+        self.progress_bar.pack(fill=tk.X, pady=(0, 5))
+        
+        self.log_text = tk.Text(bottom_frame, height=4, state=tk.DISABLED, wrap=tk.WORD, font=("Consolas", 9), bg="#F1F1F1", relief=tk.FLAT)
+        self.log_text.pack(fill=tk.X)
 
     def setup_dnd(self):
         """设置拖拽功能"""
-        def on_drop(event):
-            paths = self.parse_drop_data(event.data)
-            self.add_images_from_paths(paths)
+        if not HAS_DND: return
+        self.tree.drop_target_register(DND_FILES)
         
-        def on_drag_enter(event):
-            self.tree.configure(background="#f0f8ff")
-            
-        def on_drag_leave(event):
+        def on_drop(event):
+            # 使用 splitlist 完美解析包含空格的文件路径
+            paths = self.tree.tk.splitlist(event.data)
+            self.add_images_from_paths(paths)
             self.tree.configure(background="white")
             
         self.tree.dnd_bind('<<Drop>>', on_drop)
-        self.tree.dnd_bind('<<DragEnter>>', on_drag_enter)
-        self.tree.dnd_bind('<<DragLeave>>', on_drag_leave)
-    
-    def parse_drop_data(self, data):
-        """解析拖拽数据"""
-        # 处理 Windows 的拖拽数据格式
-        pattern = re.compile(r'\{([^}]+)\}|(\S+)')
-        matches = pattern.findall(data)
-        paths = []
-        for group in matches:
-            path = group[0] if group[0] else group[1]
-            if path:
-                paths.append(path)
-        return paths
+        self.tree.dnd_bind('<<DragEnter>>', lambda e: self.tree.configure(background="#E3F2FD"))
+        self.tree.dnd_bind('<<DragLeave>>', lambda e: self.tree.configure(background="white"))
 
     def log(self, msg, level="INFO"):
         """写入日志"""
         ts = datetime.now().strftime("%H:%M:%S")
+        color = "red" if level == "ERROR" else "black"
         self.log_text.configure(state=tk.NORMAL)
-        self.log_text.insert(tk.END, f"[{ts}][{level}] {msg}\n")
+        self.log_text.insert(tk.END, f"[{ts}] {msg}\n")
         self.log_text.see(tk.END)
-        self.log_text.configure(state=tk.DISABLED)
-        
-    def clear_log(self):
-        """清空日志"""
-        self.log_text.configure(state=tk.NORMAL)
-        self.log_text.delete(1.0, tk.END)
         self.log_text.configure(state=tk.DISABLED)
         
     def fmt_size(self, b):
@@ -272,30 +242,11 @@ class ImageCompressorApp:
         if b < 1024: return f"{b} B"
         if b < 1024**2: return f"{b/1024:.1f} KB"
         return f"{b/1024**2:.2f} MB"
-    
-    def update_global_label(self, val=None):
-        self.global_label.config(text=f"{self.global_ratio.get()}%")
         
-    def update_custom_label(self, val=None):
-        self.custom_label.config(text=f"{self.custom_ratio.get()}%")
-        
-    def set_global_ratio(self, val):
-        self.global_ratio.set(val)
-        self.update_global_label()
-        
-    def on_format_change(self, event=None):
-        """全局格式变更提示"""
-        fmt = self.output_format.get()
-        hints = {
-            "保持原格式": "智能保持原格式",
-            "JPEG (.jpg)": "适合照片，体积小，不支持透明",
-            "WebP (.webp)": "新一代格式，体积最小，支持透明",
-            "PNG (.png)": "无损压缩，适合图标/插画，体积较大",
-            "ICO (.ico)": "图标格式，支持多尺寸，体积中等",
-            "BMP (.bmp)": "无压缩位图，体积巨大"
-        }
-        self.format_hint.config(text=f"提示: {hints.get(fmt, '')}")
-        
+    def change_output_dir(self):
+        d = filedialog.askdirectory(title="选择输出目录", initialdir=self.output_dir_var.get())
+        if d: self.output_dir_var.set(d)
+
     def on_tree_select(self, event):
         """列表选择事件，同步右侧设置"""
         sels = self.tree.selection()
@@ -303,12 +254,13 @@ class ImageCompressorApp:
             item_id = sels[0]
             if item_id in self.image_data:
                 data = self.image_data[item_id]
-                self.custom_ratio.set(data["ratio"].get())
-                self.custom_format.set(data["format"].get())
-                self.update_custom_label()
+                self.custom_quality.set(data["quality"].get())
+                self.custom_scale_pct.set(data["scale"].get())
+                self.c_q_label.config(text=f"{data['quality'].get()}%")
+                self.c_s_label.config(text=f"{data['scale'].get()}%")
                 
     def select_files(self):
-        files = filedialog.askopenfilenames(title="选择图片", filetypes=[("图片", "*.jpg *.png *.jpeg *.bmp *.webp *.gif *.ico"), ("所有", "*.*")])
+        files = filedialog.askopenfilenames(title="选择图片", filetypes=[("图片文件", "*.jpg *.png *.jpeg *.bmp *.webp *.gif *.ico")])
         if files: self.add_images_from_paths(files)
         
     def select_folder(self):
@@ -316,346 +268,284 @@ class ImageCompressorApp:
         if folder: self.add_images_from_paths([folder])
         
     def add_images_from_paths(self, paths):
-        """批量添加图片"""
         count = 0
         for p in paths:
             path = Path(p)
             if not path.exists(): continue
-            
             if path.is_file():
                 if self.add_single_image(path): count += 1
             elif path.is_dir():
-                count += self.scan_folder(path)
-                
+                for root, _, files in os.walk(path):
+                    for f in files:
+                        if self.add_single_image(Path(root) / f): count += 1
+        
+        self.refresh_list_colors()
+        self.update_stats()
         if count > 0:
-            self.log(f"添加了 {count} 张图片")
-            self.update_stats()
-        else:
-            self.log("未找到有效图片", "WARN")
+            self.log(f"成功导入 {count} 张图片")
             
-    def scan_folder(self, folder):
-        """递归扫描文件夹"""
-        count = 0
-        for root, _, files in os.walk(folder):
-            for f in files:
-                if self.add_single_image(Path(root) / f): count += 1
-        return count
-    
     def add_single_image(self, path):
-        """添加单张图片"""
         if path.suffix.lower() not in self.supported_formats:
             return False
         
         path_str = str(path.resolve())
         # 去重
-        for d in self.image_data.values():
-            if d["path"] == path_str: return False
-            
-        try:
-            size = path.stat().st_size
-            item_id = f"img_{self.item_counter}"
-            self.item_counter += 1
-            
-            # 初始设置跟随全局
-            ratio_var = tk.IntVar(value=self.global_ratio.get())
-            format_var = tk.StringVar(value=self.output_format.get())
-            
-            self.tree.insert("", tk.END, iid=item_id, values=(
-                path.name, self.fmt_size(size), 
-                format_var.get().split(" ")[0], 
-                f"{ratio_var.get()}%", "-", "-", "待处理"
-            ))
-            
-            self.image_data[item_id] = {
-                "path": path_str, "name": path.name,
-                "size": size, "ratio": ratio_var, "format": format_var
-            }
-            return True
-        except Exception as e:
-            self.log(f"添加失败 {path.name}: {e}", "ERROR")
+        if any(d["path"] == path_str for d in self.image_data.values()): 
             return False
             
+        size = path.stat().st_size
+        item_id = f"img_{self.item_counter}"
+        self.item_counter += 1
+        
+        # 初始参数绑定全局
+        q_var = tk.IntVar(value=self.global_quality.get())
+        s_var = tk.IntVar(value=self.global_scale_pct.get())
+        fmt_var = tk.StringVar(value=self.output_format.get())
+        
+        self.tree.insert("", tk.END, iid=item_id, values=(
+            path.name, self.fmt_size(size), 
+            fmt_var.get().split(" ")[0], 
+            f"{q_var.get()}%", f"{s_var.get()}%", "-", "-", "待处理"
+        ))
+        
+        self.image_data[item_id] = {
+            "path": path_str, "name": path.name, "size": size, 
+            "quality": q_var, "scale": s_var, "format": fmt_var
+        }
+        return True
+        
+    def refresh_list_colors(self):
+        """刷新列表奇偶行颜色"""
+        for index, item in enumerate(self.tree.get_children()):
+            # 保留原本的状态颜色
+            current_tags = self.tree.item(item, "tags")
+            if "success" not in current_tags and "error" not in current_tags:
+                tag = 'even' if index % 2 == 0 else 'odd'
+                self.tree.item(item, tags=(tag,))
+                
     def delete_selected(self):
-        """删除选中项"""
         sels = self.tree.selection()
-        if not sels:
-            messagebox.showwarning("提示", "请先选择图片")
-            return
+        if not sels: return
         for sid in sels:
             if sid in self.image_data:
                 del self.image_data[sid]
                 self.tree.delete(sid)
-        self.log(f"已删除 {len(sels)} 项")
+        self.refresh_list_colors()
         self.update_stats()
         
     def clear_all(self):
-        """清空列表"""
         if not self.image_data: return
-        if messagebox.askyesno("确认", "清空所有列表？"):
-            self.image_data.clear()
-            self.tree.delete(*self.tree.get_children())
-            self.update_stats()
-            self.log("列表已清空")
+        self.image_data.clear()
+        self.tree.delete(*self.tree.get_children())
+        self.update_stats()
+        self.log("列表已清空")
             
     def apply_global_settings(self):
-        """应用全局设置"""
         fmt = self.output_format.get()
-        ratio = self.global_ratio.get()
-        
+        q = self.global_quality.get()
+        s = self.global_scale_pct.get()
         for item_id, data in self.image_data.items():
-            data["ratio"].set(ratio)
+            data["quality"].set(q)
+            data["scale"].set(s)
             data["format"].set(fmt)
             self.update_tree_row(item_id)
-            
-        self.log(f"已应用全局设置: {fmt}, 质量 {ratio}%")
+        self.log(f"已应用全局参数: {fmt.split(' ')[0]}, 画质 {q}%, 缩放 {s}%")
         
     def apply_custom_settings(self):
-        """应用自定义设置"""
         sels = self.tree.selection()
-        if not sels:
-            messagebox.showwarning("提示", "请先选择图片")
-            return
-            
-        fmt = self.custom_format.get()
-        ratio = self.custom_ratio.get()
-        
+        if not sels: return
+        q = self.custom_quality.get()
+        s = self.custom_scale_pct.get()
         for sid in sels:
             if sid in self.image_data:
-                self.image_data[sid]["ratio"].set(ratio)
-                self.image_data[sid]["format"].set(fmt)
+                self.image_data[sid]["quality"].set(q)
+                self.image_data[sid]["scale"].set(s)
                 self.update_tree_row(sid)
-                
-        self.log(f"已应用自定义设置到 {len(sels)} 张图片")
+        self.log(f"已为 {len(sels)} 张图片应用独立参数")
         
     def update_tree_row(self, item_id):
-        """更新Treeview行显示"""
-        if item_id not in self.image_data: return
         data = self.image_data[item_id]
-        fmt_str = data["format"].get().split(" ")[0]
-        self.tree.set(item_id, "输出格式", fmt_str)
-        self.tree.set(item_id, "压缩比率", f"{data['ratio'].get()}%")
+        self.tree.set(item_id, "输出格式", data["format"].get().split(" ")[0])
+        self.tree.set(item_id, "画质", f"{data['quality'].get()}%")
+        self.tree.set(item_id, "缩放比例", f"{data['scale'].get()}%")
         
     def update_stats(self):
-        """更新统计"""
         total = len(self.image_data)
         size = sum(d["size"] for d in self.image_data.values())
-        self.stats_var.set(f"共 {total} 张图片，总大小: {self.fmt_size(size)}")
+        self.stats_var.set(f"共 {total} 个文件 | 预估总体积: {self.fmt_size(size)}")
         
     def start_compress(self):
-        """启动压缩线程"""
         if not self.image_data:
-            messagebox.showwarning("提示", "请先添加图片")
+            messagebox.showwarning("提示", "列表为空，请先添加图片！")
             return
             
+        out_path_str = self.output_dir_var.get()
+        if not out_path_str.strip():
+            messagebox.showerror("错误", "输出目录不能为空！")
+            return
+            
+        out_dir = Path(out_path_str)
         try:
-            self.output_dir.mkdir(parents=True, exist_ok=True)
+            out_dir.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            messagebox.showerror("错误", f"创建输出目录失败: {e}")
+            messagebox.showerror("错误", f"创建输出目录失败:\n{e}")
             return
             
-        self.compress_btn.config(state=tk.DISABLED)
+        self.compress_btn.config(state=tk.DISABLED, text="处理中...", bg="gray")
         self.progress_var.set(0)
+        self.log("========== 开始批量处理 ==========")
         
-        threading.Thread(target=self.run_compress, daemon=True).start()
+        # 重置所有状态颜色
+        self.refresh_list_colors()
         
-    def run_compress(self):
-        """执行压缩逻辑"""
+        threading.Thread(target=self.run_compress, args=(out_dir,), daemon=True).start()
+        
+    def run_compress(self, out_dir):
         total = len(self.image_data)
         success = 0
         fail = 0
         
-        self.log(f"开始处理 {total} 张图片...")
-        
         for idx, (item_id, data) in enumerate(self.image_data.items(), 1):
-            # 更新进度
-            self.root.after(0, lambda i=idx, t=total: self.update_progress(i, t))
+            # 更新进度条
+            self.root.after(0, lambda v=idx/total*100: self.progress_var.set(v))
             
             try:
-                result = self.compress_one(item_id, data)
+                result = self.compress_one(data, out_dir)
                 if result["ok"]:
                     success += 1
-                    self.log(f"成功: {data['name']} -> {self.fmt_size(result['size'])} (节省 {result['saved']:.1f}%)")
-                    # 更新UI
-                    self.root.after(0, lambda iid=item_id, res=result: self.update_row_success(iid, res))
+                    self.root.after(0, self.update_row_success, item_id, result)
+                    self.log(f"✔ {data['name']} -> {self.fmt_size(result['size'])}")
                 else:
                     fail += 1
-                    self.log(f"失败: {data['name']} - {result['msg']}", "ERROR")
-                    self.root.after(0, lambda iid=item_id: self.tree.set(iid, "状态", "失败"))
+                    self.root.after(0, self.update_row_fail, item_id, result['msg'])
+                    self.log(f"✖ {data['name']} 处理失败: {result['msg']}", "ERROR")
             except Exception as e:
                 fail += 1
-                self.log(f"异常: {data['name']} - {e}", "ERROR")
-                self.root.after(0, lambda iid=item_id: self.tree.set(iid, "状态", "异常"))
+                self.root.after(0, self.update_row_fail, item_id, str(e))
+                self.log(f"✖ {data['name']} 严重异常: {e}", "ERROR")
                 
-        summary = f"处理完成: 成功 {success}, 失败 {fail}"
-        self.root.after(0, lambda: self.compress_done(summary))
+        summary = f"处理完成! 成功: {success} 张, 失败: {fail} 张。"
+        self.root.after(0, self.compress_done, summary)
         
-    def compress_one(self, item_id, data):
-        """处理单张图片压缩逻辑"""
+    def compress_one(self, data, out_dir: Path):
         try:
             src_path = Path(data["path"])
+            if not src_path.exists():
+                return {"ok": False, "msg": "源文件已丢失"}
+                
             img = Image.open(src_path)
             
-            # 决定输出格式
-            target_fmt_setting = data["format"].get()
-            if "JPEG" in target_fmt_setting:
-                ext = ".jpg"
-                fmt_key = "JPEG"
-            elif "WebP" in target_fmt_setting:
-                ext = ".webp"
-                fmt_key = "WEBP"
-            elif "PNG" in target_fmt_setting:
-                ext = ".png"
-                fmt_key = "PNG"
-            elif "ICO" in target_fmt_setting:
-                ext = ".ico"
-                fmt_key = "ICO"
-            elif "BMP" in target_fmt_setting:
-                ext = ".bmp"
-                fmt_key = "BMP"
-            else:
-                # 保持原格式
-                ext = src_path.suffix.lower()
-                if ext in [".jpg", ".jpeg"]:
-                    fmt_key = "JPEG"
-                elif ext == ".webp":
-                    fmt_key = "WEBP"
-                elif ext == ".png":
-                    fmt_key = "PNG"
-                elif ext == ".ico":
-                    fmt_key = "ICO"
-                elif ext == ".bmp":
-                    fmt_key = "BMP"
-                else:
-                    fmt_key = "PNG" # 默认兜底
+            # 解析格式
+            target_fmt = data["format"].get()
+            ext = src_path.suffix.lower()
+            fmt_key = "JPEG" if ext in ['.jpg', '.jpeg'] else ext[1:].upper()
             
-            quality = data["ratio"].get()
+            if "JPEG" in target_fmt: ext, fmt_key = ".jpg", "JPEG"
+            elif "WebP" in target_fmt: ext, fmt_key = ".webp", "WEBP"
+            elif "PNG" in target_fmt: ext, fmt_key = ".png", "PNG"
+            elif "ICO" in target_fmt: ext, fmt_key = ".ico", "ICO"
             
-            # 构造输出文件名
-            out_name = src_path.stem + ext
-            out_path = self.output_dir / out_name
-            counter = 1
-            while out_path.exists():
-                out_path = self.output_dir / f"{src_path.stem}_{counter}{ext}"
-                counter += 1
+            # 1. 处理缩放 (Resize)
+            scale = data["scale"].get()
+            if scale < 100:
+                new_w = max(1, int(img.width * (scale / 100)))
+                new_h = max(1, int(img.height * (scale / 100)))
+                img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
             
-            # 处理转换逻辑
-            save_opts = {}
-            
-            # 通道转换预处理
-            if fmt_key in ["JPEG", "BMP"]:
-                # JPEG/BMP 不支持透明，必须转RGB并填充背景
+            # 2. 处理通道 (透明度兼容)
+            if fmt_key == "JPEG":
                 if img.mode in ("RGBA", "P", "LA"):
                     bg = Image.new("RGB", img.size, (255, 255, 255))
-                    if img.mode == "P":
-                        img = img.convert("RGBA")
-                    bg.paste(img, mask=img.split()[-1]) # 使用Alpha通道作为mask
+                    if img.mode == "P": img = img.convert("RGBA")
+                    if img.mode == "RGBA" or img.mode == "LA":
+                        bg.paste(img, mask=img.split()[-1])
                     img = bg
                 elif img.mode != "RGB":
                     img = img.convert("RGB")
+                    
+            # 3. 输出路径与重命名
+            out_name = src_path.stem + ext
+            out_path = out_dir / out_name
+            counter = 1
+            while out_path.exists():
+                out_path = out_dir / f"{src_path.stem}_{counter}{ext}"
+                counter += 1
+                
+            # 4. 保存参数构建
+            save_opts = {'format': fmt_key}
+            quality = data["quality"].get()
             
-            # ICO 特殊处理：限制最大尺寸以保证兼容性
-            if fmt_key == "ICO":
-                # Windows 标准ICO最大256x256
+            if fmt_key in ["JPEG", "WEBP"]:
+                save_opts['quality'] = quality
+                if fmt_key == "JPEG": save_opts['optimize'] = True
+            elif fmt_key == "PNG":
+                # PNG optimize 减小体积，不损失画质但处理较慢
+                save_opts['optimize'] = True 
+            elif fmt_key == "ICO":
                 if max(img.size) > 256:
                     img.thumbnail((256, 256), Image.Resampling.LANCZOS)
-                # ICO格式保存参数
-                save_opts['format'] = 'ICO'
                 save_opts['sizes'] = [(16,16), (32,32), (48,48), (64,64), (128,128), (256,256)]
-            
-            # 设置保存参数
-            if fmt_key == "JPEG":
-                save_opts['format'] = 'JPEG'
-                save_opts['quality'] = quality
-                save_opts['optimize'] = True
-            elif fmt_key == "WEBP":
-                save_opts['format'] = 'WEBP'
-                save_opts['quality'] = quality
-            elif fmt_key == "PNG":
-                save_opts['format'] = 'PNG'
-                # PNG质量参数(0-9), 值越小压缩越少(文件大但快), 值越大压缩越多(文件小但慢)
-                # 这里的质量百分比反向映射到 compress_level
-                # 用户选quality=90%, 对应 compress_level=1 (低压缩)
-                # 用户选quality=10%, 对应 compress_level=9 (高压缩)
-                level = int(9 - (quality / 100) * 9)
-                save_opts['compress_level'] = level
-            elif fmt_key == "BMP":
-                save_opts['format'] = 'BMP'
-            
-            # 保存
+                
             img.save(out_path, **save_opts)
             
             out_size = out_path.stat().st_size
-            saved_percent = (1 - out_size / data["size"]) * 100 if data["size"] > 0 else 0
+            saved_pct = (1 - out_size / data["size"]) * 100 if data["size"] > 0 else 0
             
-            return {
-                "ok": True, 
-                "size": out_size, 
-                "saved": saved_percent,
-                "ratio": quality
-            }
+            return {"ok": True, "size": out_size, "saved": saved_pct}
             
         except Exception as e:
             return {"ok": False, "msg": str(e)}
             
     def update_row_success(self, item_id, res):
-        """更新成功行"""
-        self.tree.set(item_id, "压缩后大小", self.fmt_size(res["size"]))
-        self.tree.set(item_id, "压缩率", f"{res['saved']:.1f}%")
-        self.tree.set(item_id, "状态", "成功")
-        # 闪烁效果或颜色标记可选
+        self.tree.set(item_id, "处理后大小", self.fmt_size(res["size"]))
+        # 根据压缩率显示不同符号
+        sign = "↓" if res['saved'] >= 0 else "↑"
+        self.tree.set(item_id, "压缩率", f"{sign} {abs(res['saved']):.1f}%")
+        self.tree.set(item_id, "状态", "✅ 成功")
+        self.tree.item(item_id, tags=("success",))
         
-    def update_progress(self, current, total):
-        """更新进度条"""
-        val = (current / total) * 100
-        self.progress_var.set(val)
-        self.progress_label.config(text=f"{current}/{total}")
+    def update_row_fail(self, item_id, msg):
+        self.tree.set(item_id, "状态", "❌ 失败")
+        self.tree.item(item_id, tags=("error",))
         
     def compress_done(self, msg):
-        """压缩完成回调"""
-        self.compress_btn.config(state=tk.NORMAL)
+        self.compress_btn.config(state=tk.NORMAL, text="🚀 开始处理", bg="#0078D7")
         self.progress_var.set(100)
-        self.log(msg)
-        if messagebox.askyesno("完成", f"{msg}\n\n是否打开输出目录？"):
+        self.log("========== 处理结束 ==========")
+        if messagebox.askyesno("处理完成", f"{msg}\n\n是否打开输出目录？"):
             self.open_output_dir()
             
     def open_output_dir(self):
-        """打开输出目录"""
         try:
-            self.output_dir.mkdir(exist_ok=True)
-            import platform
-            if platform.system() == "Windows":
-                os.startfile(self.output_dir)
-            elif platform.system() == "Darwin":
-                os.system(f'open "{self.output_dir}"')
+            d = self.output_dir_var.get()
+            Path(d).mkdir(parents=True, exist_ok=True)
+            if sys.platform == "win32":
+                os.startfile(d)
+            elif sys.platform == "darwin":
+                os.system(f'open "{d}"')
             else:
-                os.system(f'xdg-open "{self.output_dir}"')
+                os.system(f'xdg-open "{d}"')
         except Exception as e:
             messagebox.showerror("错误", f"无法打开目录: {e}")
-
 
 def main():
     if HAS_DND:
         root = TkinterDnD.Tk()
     else:
         root = tk.Tk()
-        print("提示: 安装 tkinterdnd2 可启用拖拽功能")
-        
-    style = ttk.Style()
-    try:
-        style.theme_use('clam')
-    except:
-        pass
+        print("提示: 未安装 tkinterdnd2，无法启用拖拽功能")
         
     app = ImageCompressorApp(root)
     
-    # 居中
+    # 屏幕居中
     root.update_idletasks()
-    w, h = root.winfo_width(), root.winfo_height()
-    sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
+    w = root.winfo_width()
+    h = root.winfo_height()
+    sw = root.winfo_screenwidth()
+    sh = root.winfo_screenheight()
     root.geometry(f"+{(sw-w)//2}+{(sh-h)//2}")
     
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()
