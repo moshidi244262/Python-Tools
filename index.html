@@ -113,7 +113,7 @@
     <!-- 页脚 -->
     <footer class="border-t border-slate-800 bg-slate-900/50 py-8 mt-auto">
         <div class="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
-            <p class="text-slate-500 text-sm">© 2024 moshidi244262. 毕业求职作品集.</p>
+            <p class="text-slate-500 text-sm">© 2026 moshidi244262. Python工具作品集.</p>
             <div class="flex space-x-4 mt-4 md:mt-0 text-slate-400">
                 <a href="https://github.com/moshidi244262" target="_blank" class="hover:text-white transition"><i class="fa-brands fa-github"></i></a>
             </div>
@@ -157,19 +157,19 @@
         // 如果你将来把打包好的 exe 传到了 Releases，可以改这里
         const DOWNLOAD_BASE = "https://github.com/moshidi244262/Python-Tools/raw/main";
 
-        // 工具数据字典 (已添加 longDesc 和 features 以供详情页展示)
+        // 工具数据字典
         const toolsData = [
             {
                 id: 'audio-text',
-                title: 'Whisper 音视频转文本 Pro Max',
+                title: 'Whisper 音视频转文本',
                 icon: 'fa-solid fa-microphone-lines text-emerald-400',
                 desc: '基于本地化部署的 Whisper 模型构建的智能转录工具，支持数十种音视频格式，支持拖拽及批量处理。',
                 longDesc: '告别手动听打！这是一款强大的本地音视频转文本桌面应用。不仅支持纯音频，还能直接解析 MP4、MKV 等视频文件中的音频流。工具完全离线运行，隐私安全。该版本新增了 GPU 加速检测、多格式导出(TXT/SRT/LRC)，以及初始提示词防繁体字等贴心功能。',
                 imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yw.png', 
-                installCmd: 'pip install openai-whisper tkinterdnd2 torch', // 运行库依赖命令
+                installCmd: 'pip install openai-whisper tkinterdnd2 torch',
                 features: [
                     '支持 GPU 加速，大幅提升长视频/音频的转录速度',
-                    '支持导出纯文本(TXT)、标准字幕(SRT)和歌词(LRC)格式',
+                    '支持导出纯文本(TXT)、标准字幕(SRT)和歌词(LRC)',
                     '提供 tiny 到 turbo 多种模型切换，平衡速度与精度',
                     '支持鼠标拖拽，一键批量处理文件和文件夹',
                     '内置初始提示词设置，可有效减少 AI 繁体字输出'
@@ -180,68 +180,88 @@
             },
             {
                 id: 'gif-compress',
-                title: 'GIF 图压缩工具 v1.1',
+                title: 'GIF 压缩工具',
                 icon: 'fa-solid fa-file-image text-pink-400',
-                desc: '智能压缩GIF图片体积。支持批量拖拽，全局/自定义压缩比率调节，自动保留动画帧结构。基于 Pillow 库开发。',
-                longDesc: '这是一款基于 Python 和 Pillow 图像处理库开发的轻量级桌面端 GIF 压缩工具。主要解决日常中表情包、网页动图过大无法上传平台的问题。它通过智能减少颜色表和抽帧技术，在肉眼几乎看不出画质损失的情况下，将文件体积缩减到极致。',
-                imageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80', 
+                desc: '一款基于 Pillow 和 Tkinter 的多线程 GIF 动图压缩工具。支持文件拖拽导入、全局与单文件独立压缩率调节，有效减小体积并保留帧动画。',
+                longDesc: '这是一款全新升级的桌面端 GIF 压缩工具 v2.0。主要解决日常社交平台发图、网页排版中动图文件过大导致上传失败或加载缓慢的痛点。\n\n【技术解析】：程序采用 Python 原生 Tkinter 配合现代化的 ttk 样式构建 UI。底层图像处理基于强大的 Pillow 库：它通过拆解 GIF 的每一帧，采用高质量的 LANCZOS 算法缩放分辨率，并使用自适应调色板（Adaptive Palette）大幅减少颜色数量，在最后组装时完美继承了原图的持续时间(duration)与循环模式(loop)。此外，内置多线程(threading)异步架构，确保在执行高耗时的压缩任务时主界面不卡顿；并深度集成了 tkinterdnd2 库以实现流畅的文件拖拽交互。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-gif.png', 
+                installCmd: 'pip install Pillow tkinterdnd2',
                 features: [
-                    '支持鼠标拖拽批量导入文件',
-                    '提供全局统一压缩率和单文件独立调节',
-                    '完美保留原始 GIF 的动画结构和延迟时间',
-                    '直观的转换进度条与本地日志记录'
+                    '交互便捷：集成 TkinterDnD，支持一键拖拽单个或多个 GIF 文件及整个文件夹',
+                    '精细化参数控制：提供全局统一压缩率滑块，同时支持在列表双击某张动图进行独立的比率修改',
+                    '完美动画重组：自动提取并保留原 GIF 的逐帧延迟时间、帧序列结构和无限循环模式',
+                    '多线程防卡顿：压缩任务在后台异步线程执行，具备实时更新的进度条、单文件体积节省统计以及操作中止功能',
+                    '智能重采样优化：运用 LANCZOS 重采样算法缩放尺寸，并智能缩减色彩表(P模式转换)，实现极致压缩'
                 ],
-                tags: ['Pillow', '多线程', '批量处理'],
+                tags: ['Pillow图像处理', '多线程异步', 'TkinterDnD', '自适应调色板'],
                 sourceFolder: 'Gif图压缩',
                 mainFile: 'Gif-yasuo.py'
             },
             {
                 id: 'tavern-json',
-                title: '酒馆角色卡转 JSON v2.0',
+                title: '酒馆角色卡提取工具',
                 icon: 'fa-solid fa-masks-theater text-purple-400',
-                desc: '将包含角色信息的PNG/WEBP角色卡图，通过Base64解码快速提取并转换为结构化的JSON格式数据。',
-                longDesc: '专门为 AI 角色扮演爱好者（酒馆/Tavern 用户）开发的解析工具。在 AI 社区中，角色设定往往被隐写在图片文件的EXIF或附属数据中。本工具能够深入解析图片二进制流，将其中的设定数据完整提取，并转换为前端或其它引擎容易读取的标准 JSON 配置格式。',
-                imageUrl: '', 
+                desc: '一款强大的酒馆角色卡解析工具。支持拖拽批量处理，通过解析图片元数据及底层二进制扫描，极速提取隐写的 Base64 数据并转换为结构化 JSON。',
+                longDesc: '这是一款专为 AI 角色扮演爱好者（酒馆/Tavern 用户）打造的数据提取工具 v3.0 增强美化版。AI 社区中的角色设定常被隐写在 PNG 或 WebP 图片的附加数据中。本工具不仅能标准读取 PNG 文本块和 EXIF 信息，还独创了“暴力二进制特征扫描”兜底方案，即便是 Pillow 无法正常加载受损图片，也能精准定位并解码其中的 Base64 隐写设定。配备现代化 Tkinter 界面，支持多线程与文件拖拽，是本地角色数据管理的神器。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-jg.png', 
+                installCmd: 'pip install Pillow tkinterdnd2',
                 features: [
-                    '支持 PNG 和 WEBP 两种主流角色卡格式',
-                    '自动定位并解码 Base64 隐写数据',
-                    '输出标准的结构化 JSON，支持嵌套字段',
-                    '界面清爽，支持一键清空和格式化展示'
+                    '多级解析引擎：支持解析 PNG tEXt 块、WebP EXIF，以及底层二进制暴力扫描兜底',
+                    '极致容错：自动补齐残缺的 Base64 Padding，精准解码并导出标准格式化 JSON 文件',
+                    '高效交互：原生集成 tkinterdnd2，支持鼠标一键拖拽单个、多个文件或整个文件夹',
+                    '异步处理：采用多线程后台处理提取任务，结合实时进度条与状态日志，大批量提取不卡顿',
+                    '智能防重名：自动提取图片角色内部的 name 字段作为文件名，并具备完善的重命名冲突机制'
                 ],
-                tags: ['正则解析', 'Base64解码', 'JSON构建'],
+                tags: ['Pillow解析', 'Base64解码', '正则扫描', 'TkinterDnD'],
                 sourceFolder: '酒馆角色卡转JSON',
                 mainFile: 'JSON-jiuguan.py'
             },
             {
                 id: 'img-compress',
-                title: '图片压缩小工具',
+                title: '图片压缩处理',
                 icon: 'fa-regular fa-image text-blue-400',
-                desc: '高效的图片格式转换与体积压缩工具，自动保持图片画质，极大节省磁盘空间。',
-                longDesc: '摄影师和前端开发者的福音。采用先进的图像缩放算法与质量压缩比率算法，能够在保留图片原有分辨率或等比例缩放的前提下，大幅削减 JPG/PNG 等静态图片的存储体积。',
-                features: ['支持 JPG, PNG, WEBP 多格式互转', '自定义图像质量(0-100)', '保留 EXIF 信息开关', '极速处理引擎，百张图片秒级压缩'],
-                tags: ['图像处理', '自动化'],
+                desc: '一款功能强大的本地图片批量处理工具。支持格式互转、分辨率缩放、画质压缩，支持鼠标拖拽与多线程极速处理。',
+                longDesc: '这是一款基于 Python 和 Pillow 构建的现代化桌面端图片处理工具，专为应对日常繁杂的图片处理需求而设计。它不仅能大幅压缩 JPG、PNG、WebP 等格式的图片体积，还支持格式批量互转和分辨率按比例缩放。工具内置多线程处理引擎，百张图片批量处理毫无卡顿；结合 TkinterDnD 技术，支持鼠标一键拖拽导入文件或文件夹。最贴心的是，它不仅提供全局参数一键应用，还允许为列表中的每一张图片单独定制画质与缩放参数，精准满足各种场景需求。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-ty.png',
+                installCmd: 'pip install Pillow tkinterdnd2',
+                features: [
+                    '多格式互转：支持 JPG, PNG, WEBP, ICO 等多种主流格式',
+                    '双重设置模式：支持全局一键应用参数，也支持单张图片的独立画质/缩放调节',
+                    '集成拖拽交互：集成 tkinterdnd2 库，支持鼠标一键拖拽文件/文件夹批量导入',
+                    '多线程防卡顿：处理过程采用异步执行，配备实时进度条、直观的状态变更与运行日志',
+                    '智能图像处理：采用 LANCZOS 高质量重采样算法，并自动处理透明通道的兼容与填充问题'
+                ],
+                tags: ['Pillow', 'TkinterDnD', '多线程', '批量转换'],
                 sourceFolder: '图片压缩',
                 mainFile: 'comperss-p.py'
             },
             {
                 id: 'video-audio',
-                title: '视频转音频提取器',
+                title: '视频音频提取工具',
                 icon: 'fa-solid fa-photo-film text-orange-400',
-                desc: '一键提取MP4等视频文件中的音频流，输出为高品质MP3/WAV格式，自媒体创作者必备。',
-                longDesc: '底层调用了强大的 FFmpeg 引擎。这个小巧的工具专注于做一件事：以最快的速度将视频容器中的音轨无损剥离出来，或者重新编码为您需要的音频格式。',
-                features: ['极速模式（不重编码直接提取音频流）', '自定义输出比特率 (128kbps~320kbps)', '支持批量文件夹扫描提取', '多音轨视频的音轨选择支持'],
-                tags: ['FFmpeg', '媒体流'],
+                desc: '一款高效的视频转音频桌面应用，支持批量拖拽处理。一键读取十余种视频格式，并提取为高品质 MP3 或 WAV。',
+                longDesc: '这是一款基于 Python 与 MoviePy 构建的现代化视频转音频提取工具 v2.0。它专门针对日常音视频处理场景优化，摆脱了复杂的命令行操作。程序不仅支持读取 MP4、MKV、MOV、FLV 等 11 种常见视频格式，还完美集成了鼠标拖拽交互体验（TkinterDnD）。通过多线程架构设计，您可以一次性批量导入整个文件夹的视频，并在后台无感极速完成音频的剥离与转换。任务全程由直观的进度条和日志窗口监控，是自媒体创作者提取音频素材的效率利器。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-sy.png',
+                installCmd: 'pip install moviepy tkinterdnd2',
+                features: [
+                    '广泛的格式支持：自动兼容处理 MP4, MKV, MOV, FLV, WEBM 等 11 种主流视频文件',
+                    '便捷的交互体验：原生集成 tkinterdnd2 库，支持鼠标一键拖拽文件或文件夹快速导入列表',
+                    '灵活的导出设置：支持自定义导出保存路径，可自由选择 MP3 和 WAV 两种常用音频输出格式',
+                    '多线程防卡顿：音频提取任务分配在独立后台线程异步执行，主界面实时更新处理进度与详细日志',
+                    '健壮的容错与兼容性：智能过滤非目标文件格式，并具备自检机制，若缺失依赖库会进行友好的弹窗提示'
+                ],
+                tags: ['MoviePy', 'TkinterDnD', '多线程异步', '批量处理'],
                 sourceFolder: '视频转音频',
-                mainFile: 'vedio-audio'
+                mainFile: 'vedio-audio.py'
             },
             {
                 id: 'audio-compress',
-                title: '极速音频压缩工具 v2.1',
+                title: '极速音频压缩工具',
                 icon: 'fa-solid fa-file-audio text-yellow-400',
                 desc: '基于 FFmpeg 引擎的极速音频批量压缩工具。支持多线程并发、拖拽导入，可自定义比特率、采样率与声道，在体积与音质间寻找完美平衡。',
                 longDesc: '随着高解析度音频的普及，设备的存储空间经常告急。本工具底层调用强大的 FFmpeg 引擎，结合多线程并发处理技术，为您提供极速的音频批量压缩体验。通过读取 mutagen 提取原音频元数据，实时比对压缩前后的体积与压缩率。不仅支持拖拽批量导入，还能精确调节输出的比特率 (64-320kbps)、采样率及声道，完美解决网页端加载过慢或本地存储不足的问题。',
                 imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yy.png',
-                installCmd: 'pip install mutagen tkinterdnd2', // 运行库依赖命令
+                installCmd: 'pip install mutagen tkinterdnd2',
                 features: [
                     '底层集成 FFmpeg 引擎，支持多种主流音频格式 (.flac, .wav, .mp3, .m4a 等)',
                     '支持多线程并发处理（动态分配 CPU 核心），大幅提升批量压缩速度',
@@ -255,12 +275,12 @@
             },
             {
                 id: 'music-tag',
-                title: '音乐标签极净清除工具 v3.1',
+                title: '音乐标签清除',
                 icon: 'fa-solid fa-compact-disc text-teal-400',
                 desc: '极简高效的音乐元数据清除工具。支持批量拖拽导入，一键去除音频文件中的广告标签或乱码，生成纯净版音频。',
                 longDesc: '这是一款基于 PySide6 和 Mutagen 开发的现代化桌面端工具，专门用于彻底清除音乐文件中的元数据（如 ID3、APEv2 等标签）。网上下载的音乐常带有广告网址、杂乱的封面或乱码信息，本工具可帮您一键提取纯净音频。程序采用多线程无损处理机制，自动在原目录创建“去标签音乐”文件夹并复制处理，绝不覆盖您的原始文件。',
                 imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yb.png',
-                installCmd: 'pip install PySide6 mutagen', // 运行库依赖命令
+                installCmd: 'pip install PySide6 mutagen',
                 features: [
                     '深度清理：基于 mutagen 库彻底擦除各类音频元数据标签',
                     '无损安全：自动复制并处理，保留原文件不动，杜绝文件损坏风险',
@@ -274,23 +294,39 @@
             },
             {
                 id: 'file-md',
-                title: '文件转 .md 工具',
+                title: '通用文件转 Markdown 工具 ',
                 icon: 'fa-brands fa-markdown text-sky-400',
-                desc: '支持将文档、代码文件快速格式化为 Markdown 语法格式，便于博客编写与知识库沉淀。',
-                longDesc: '为了方便将本地的散落笔记、代码片段整理进 Obsidian 或 Hexo 博客，我编写了这个转化器。它可以读取多种纯文本格式，自动提取标题层级和代码块，并将其包装为标准且美观的 Markdown 文件。',
-                features: ['支持自动识别代码语言并添加代码块反引号', '可根据空行智能生成段落', '合并多个小文件为一个长 MD 文件', '生成清晰的文件目录树 (TOC)'],
-                tags: ['文本处理', '格式化'],
+                desc: '支持将数十种文档（Word, PDF, Excel等）和代码文件快速转换为 Markdown 格式，支持拖拽与批量处理。',
+                longDesc: '通用文件转 Markdown 工具 Pro 是一款功能强大的本地格式转换应用。它能将多达 40 种文件格式（包括 doc/docx, pdf, ppt/pptx, xls/xlsx, rtf 以及各类纯文本/代码文件）快速提取文本、表格、排版层级等内容，并统一格式化为标准 Markdown 文件。本工具内置了多线程并发处理机制，有效防止大批量转换时界面卡顿；支持鼠标直接拖拽文件或文件夹导入任务列表。极其适合开发者、创作者进行个人知识库管理（如 Obsidian、Notion）或博客撰写的数据清洗，能够完美保留原有文件里的表格排版和代码块语法高亮标签。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-md.png',
+                installCmd: 'pip install python-docx PyPDF2 python-pptx pandas tabulate openpyxl tkinterdnd2 pdfplumber pywin32',
+                features: [
+                    '极其广泛的格式支持：覆盖主流办公文档、PDF 以及数十种编程语言代码文件',
+                    '智能排版解析：准确提取 Word/PDF 中的段落标题层级（Heading 1-3），完美转化表格为 MD 表格',
+                    '支持鼠标拖拽：集成 TkinterDnD，一键拖拽文件或文件夹批量添加到待转换队列',
+                    '高性能与稳定性：采用多线程处理转换任务，避免 UI 卡死，实时更新进度与状态日志',
+                    '旧格式兼容：在 Windows 平台下可调用 COM 组件自动解析 .doc, .ppt, .rtf 等旧版格式'
+                ],
+                tags: ['文档解析', '多格式转换', '多线程', '自动化排版'],
                 sourceFolder: '文件转.md',
                 mainFile: 'file-md.py'
             },
             {
                 id: 'video-compress',
-                title: '视频无损压缩',
+                title: '视频批量无损压缩工具',
                 icon: 'fa-solid fa-video text-rose-400',
-                desc: '利用先进的H.264/H.265编码技术，在保证画质的前提下，将庞大的视频文件体积缩减。',
-                longDesc: '由于原始录屏或手机拍摄的视频码率极高，不便于网络传输。这个带界面的工具封装了复杂的 FFmpeg 参数，通过控制 CRF（固定质量参数）和预设（Preset），让你只需拖动滑块就能实现视频的高效压缩。',
-                features: ['支持 H.264 与效率更高的 H.265 (HEVC) 编码', '基于 CRF 的智能画质控制', '支持硬件加速 (NVIDIA NVENC/AMD AMF)', '压制进度实时预览与预估剩余时间'],
-                tags: ['视频编码', 'FFmpeg封装'],
+                desc: '一款基于 FFmpeg 的强大的视频批量压缩桌面端工具。支持硬件加速、拖拽导入、自定义分辨率与帧率，在画质与体积之间取得完美平衡。',
+                longDesc: '本工具底层封装了强大的 FFmpeg 处理引擎，通过现代化的 Tkinter 图形界面，让复杂的视频压制参数配置变得极其直观。专为需要应对大体积录屏或高清视频存储、传输难题的用户设计。工具不仅支持 CPU (H.264/H.265) 压制，还深度整合了 NVIDIA 显卡的硬件加速（NVENC），极大提升压缩效率。程序内部采用多线程异步架构执行子进程 (subprocess)，并结合正则表达式实时解析 FFmpeg 控制台输出流，用户可通过拖拽快速批量导入视频，并精准控制 CRF 画质、定频码率、分辨率缩放、帧率调节及音频码率，实现了精准的进度条更新与运行状态监控。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-sys.png',
+                installCmd: 'pip install tkinterdnd2',
+                features: [
+                    '底层集成 FFmpeg 引擎，支持 H.264 与 H.265(HEVC) 双重高效编码',
+                    '原生支持 NVIDIA NVENC 硬件加速编码，大幅缩短长视频压制时间',
+                    '精细画质控制：支持固定质量(CRF)与指定总码率(Bitrate)双模式切换',
+                    '灵活参数调节：支持保持原始、按比例缩放或自定义分辨率，支持自定义帧率及音频码率',
+                    '现代化交互：支持鼠标拖拽文件与文件夹批量导入，多线程实时捕获并展示压缩进度条与运行日志'
+                ],
+                tags: ['FFmpeg', 'TkinterDnD', '显卡加速', '多线程异步'],
                 sourceFolder: '视频压缩',
                 mainFile: 'vedio-compress.py'
             }
@@ -356,7 +392,6 @@
 
         // 复制命令功能函数
         function copyInstallCmd(btnElement, cmdText) {
-            // 使用临时文本域方式，兼容性最佳 (包括在 iframe 中)
             const textArea = document.createElement("textarea");
             textArea.value = cmdText;
             textArea.style.position = "fixed";
@@ -434,7 +469,7 @@
                             </div>
                             <p class="text-slate-400 text-xs mt-3 flex items-start leading-relaxed">
                                 <i class="fa-solid fa-circle-info text-blue-400 mt-0.5 mr-1.5 shrink-0"></i>
-                                <span>温馨提示：请在系统终端 (CMD 或 Terminal) 中运行上述命令安装依赖。<br/>若该运行库已安装则可以跳过，即使重复安装也没问题（系统会自动提示已满足依赖条件）。</span>
+                                <span>温馨提示：请在系统终端 (CMD 或 Terminal) 中运行上述命令安装依赖。<br/>若该运行库已安装则可以跳过，即使重复安装也没问题（系统会自动提示已满足依赖条件）。对于 FFmpeg 工具依赖，请确保您已经将其添加至系统环境变量中。</span>
                             </p>
                         </div>
                     </div>
@@ -484,9 +519,7 @@
                     <h4 class="text-lg font-semibold text-white mb-3 flex items-center">
                         <i class="fa-solid fa-book-open text-blue-400 mr-2"></i>工具详述
                     </h4>
-                    <p class="text-slate-300 text-sm sm:text-base leading-relaxed bg-slate-900/50 p-4 sm:p-5 rounded-xl border border-slate-700/50">
-                        ${tool.longDesc || tool.desc}
-                    </p>
+                    <p class="text-slate-300 text-sm sm:text-base leading-relaxed bg-slate-900/50 p-4 sm:p-5 rounded-xl border border-slate-700/50 whitespace-pre-wrap">${tool.longDesc || tool.desc}</p>
                 </div>
 
                 <!-- 工具图片预览 -->
