@@ -130,32 +130,23 @@ Python-Tools/
 ├── index.html                    # 主展示网站
 ├── README.md                     # 项目说明文档
 ├── 音频转文本/                   # 工具1：音视频转文本
-│   ├── audio-to-txt.py
-│   └── requirements.txt
+│   └── audio-to-txt.py
 ├── Gif图压缩/                    # 工具2：GIF压缩
-│   ├── Gif-yasuo.py
-│   └── 示例图片/
+│   └── Gif-yasuo.py
 ├── 酒馆角色卡转JSON/             # 工具3：角色卡提取
-│   ├── JSON-jiuguan.py
-│   └── 示例角色卡/
+│   └── JSON-jiuguan.py
 ├── 图片压缩/                     # 工具4：图片处理
-│   ├── comperss-p.py
-│   └── 测试图片/
+│   └── comperss-p.py
 ├── 视频转音频/                   # 工具5：音频提取
-│   ├── vedio-audio.py
-│   └── 示例视频/
+│   └── vedio-audio.py
 ├── 音频压缩/                     # 工具6：音频压缩
-│   ├── audio-comperss.py
-│   └── 示例音频/
+│   └── audio-comperss.py
 ├── 音乐标签去除工具/             # 工具7：标签清除
-│   ├── audio-label.py
-│   └── 带标签音乐/
+│   └── audio-label.py
 ├── 文件转.md/                    # 工具8：文档转换
-│   ├── file-md.py
-│   └── 示例文档/
+│   └── file-md.py
 └── 视频压缩/                     # 工具9：视频压缩
-    ├── vedio-compress.py
-    └── 示例视频/
+    └── vedio-compress.py
 ```
 
 ---
