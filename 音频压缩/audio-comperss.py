@@ -1,6 +1,5 @@
 # 依赖安装: pip install mutagen tkinterdnd2
-# 终极优化版：移除 pydub 依赖，直接使用原生 subprocess 调用 ffmpeg，完美兼容 Python 3.13/3.14+
-# 注意：需要安装ffmpeg并添加到系统PATH，或将ffmpeg.exe放在脚本同目录
+# 优化说明：修复UI线程安全、加入多线程并发、新增进度条、自定义输出路径、UI全面美化、恢复详细参数显示
 
 import os
 import sys
@@ -11,679 +10,516 @@ import traceback
 from pathlib import Path
 import subprocess
 import shutil
+import queue
+from concurrent.futures import ThreadPoolExecutor
+import time
 
 # ==========================================
-# 安全导入第三方库 (防止双击由于缺环境导致闪退)
+# 安全导入第三方库
 # ==========================================
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
     import mutagen
-    from mutagen.flac import FLAC
-    from mutagen.wave import WAVE
-    from mutagen.mp3 import MP3, EasyMP3
-    from mutagen.aiff import AIFF
 except ImportError as e:
-    # 捕获导入错误并使用系统弹窗提示
     root = tk.Tk()
-    root.withdraw()  # 隐藏主窗口
-    error_msg = f"启动失败，缺少必要的第三方库：\n{str(e)}\n\n" \
-                f"当前使用的Python路径：\n{sys.executable}\n\n" \
-                f"请确保运行以下命令安装环境（已移除pydub依赖）：\n" \
-                f"pip install mutagen tkinterdnd2"
+    root.withdraw()
+    error_msg = f"启动失败，缺少第三方库：\n{str(e)}\n\n请运行：pip install mutagen tkinterdnd2"
     messagebox.showerror("环境配置错误", error_msg)
     sys.exit(1)
 
 
 class AudioCompressorApp:
-    """音频压缩工具主类"""
-    
-    SUPPORTED_FORMATS = ('.flac', '.wav', '.mp3')
+    SUPPORTED_FORMATS = ('.flac', '.wav', '.mp3', '.m4a', '.aac', '.ogg')
     
     def __init__(self, root):
         self.root = root
-        self.root.title("音频压缩工具 - FLAC/WAV/MP3 转 MP3 (原生FFmpeg驱动)")
-        self.root.geometry("1200x800")
-        self.root.minsize(900, 600)
+        self.root.title("✨ 极速音频压缩工具 v2.1 (多线程+详细参数+FFmpeg引擎)")
+        self.root.geometry("1150x750")
+        self.root.minsize(1000, 650)
+        
+        # 启用现代主题
+        style = ttk.Style()
+        if 'clam' in style.theme_names():
+            style.theme_use('clam')
+            
+        # 线程安全队列
+        self.ui_queue = queue.Queue()
         
         # 数据存储
         self.audio_files = {}  # {filepath: info_dict}
-        self.output_dir = Path(__file__).parent / "压缩音频"
         
-        # 压缩参数变量
-        self.bitrate_var = tk.StringVar(value="192")
+        # 变量
+        self.bitrate_var = tk.StringVar(value="128")
         self.sample_rate_var = tk.StringVar(value="44100")
         self.channels_var = tk.StringVar(value="2")
+        self.output_dir_var = tk.StringVar(value=str(Path.home() / "Desktop" / "压缩音频输出"))
         
         # 标志位
         self.is_compressing = False
+        self.cancel_flag = False
+        self.completed_count = 0
+        self.total_count = 0
         
-        self._setup_ui()
         self._setup_styles()
+        self._setup_ui()
+        
+        # 启动UI事件循环处理队列
+        self.root.after(100, self._process_ui_queue)
         
     def _setup_styles(self):
-        """设置样式"""
         style = ttk.Style()
-        style.configure('Title.TLabel', font=('Microsoft YaHei', 10, 'bold'))
-        style.configure('Info.TLabel', font=('Microsoft YaHei', 9))
+        style.configure('Title.TLabel', font=('Microsoft YaHei', 10, 'bold'), foreground='#2c3e50')
+        style.configure('TButton', font=('Microsoft YaHei', 9), padding=5)
+        style.configure('Action.TButton', font=('Microsoft YaHei', 9, 'bold'))
+        style.configure('Treeview', rowheight=25, font=('Microsoft YaHei', 9))
+        style.configure('Treeview.Heading', font=('Microsoft YaHei', 9, 'bold'), background='#e1e8ed')
+        style.map('Treeview', background=[('selected', '#3498db')])
         
     def _setup_ui(self):
-        """构建用户界面"""
-        # ========== 顶部参数设置区域 ==========
-        param_frame = ttk.LabelFrame(self.root, text="压缩参数设置", padding=10)
-        param_frame.pack(fill='x', padx=10, pady=5)
+        # ========== 顶部参数与路径设置 ==========
+        top_frame = ttk.Frame(self.root)
+        top_frame.pack(fill='x', padx=15, pady=10)
         
-        # 第一行参数
-        row1 = ttk.Frame(param_frame)
-        row1.pack(fill='x', pady=2)
+        # 参数设置区
+        param_frame = ttk.LabelFrame(top_frame, text=" ⚙️ 压缩参数 ", padding=10)
+        param_frame.pack(side='left', fill='y', expand=False, padx=(0, 10))
         
-        # 比特率
-        ttk.Label(row1, text="比特率:", width=10).pack(side='left')
-        self.bitrate_combo = ttk.Combobox(
-            row1, textvariable=self.bitrate_var, 
-            values=["64", "96", "128", "160", "192", "224", "256", "320"],
-            width=10, state='readonly'
-        )
-        self.bitrate_combo.pack(side='left', padx=(0, 20))
-        ttk.Label(row1, text="kbps", width=6).pack(side='left')
+        ttk.Label(param_frame, text="比特率:").grid(row=0, column=0, padx=5, pady=5)
+        ttk.Combobox(param_frame, textvariable=self.bitrate_var, 
+                    values=["64", "96", "128", "160", "192", "256", "320"], 
+                    width=6, state='readonly').grid(row=0, column=1, pady=5)
+        ttk.Label(param_frame, text="kbps").grid(row=0, column=2, padx=(0, 15))
         
-        # 采样率
-        ttk.Label(row1, text="采样率:", width=10).pack(side='left')
-        self.sample_rate_combo = ttk.Combobox(
-            row1, textvariable=self.sample_rate_var,
-            values=["8000", "11025", "16000", "22050", "32000", "44100", "48000", "96000"],
-            width=10, state='readonly'
-        )
-        self.sample_rate_combo.pack(side='left', padx=(0, 20))
-        ttk.Label(row1, text="Hz", width=6).pack(side='left')
+        ttk.Label(param_frame, text="采样率:").grid(row=0, column=3, padx=5, pady=5)
+        ttk.Combobox(param_frame, textvariable=self.sample_rate_var,
+                    values=["22050", "32000", "44100", "48000"], 
+                    width=8, state='readonly').grid(row=0, column=4, pady=5)
+        ttk.Label(param_frame, text="Hz").grid(row=0, column=5, padx=(0, 15))
         
-        # 声道数
-        ttk.Label(row1, text="声道数:", width=10).pack(side='left')
-        self.channels_combo = ttk.Combobox(
-            row1, textvariable=self.channels_var,
-            values=["1 (单声道)", "2 (立体声)"],
-            width=12, state='readonly'
-        )
-        self.channels_combo.pack(side='left', padx=(0, 20))
+        ttk.Label(param_frame, text="声道:").grid(row=0, column=6, padx=5, pady=5)
+        ttk.Combobox(param_frame, textvariable=self.channels_var,
+                    values=["1 (单声道)", "2 (立体声)"], 
+                    width=12, state='readonly').grid(row=0, column=7, pady=5)
+
+        # 路径设置区
+        path_frame = ttk.LabelFrame(top_frame, text=" 📂 输出目录 ", padding=10)
+        path_frame.pack(side='left', fill='both', expand=True)
         
-        # 输出格式提示
-        ttk.Label(row1, text="输出格式: MP3", style='Title.TLabel').pack(side='right', padx=10)
-        
-        # ========== 操作按钮区域 ==========
+        ttk.Entry(path_frame, textvariable=self.output_dir_var).pack(side='left', fill='x', expand=True, padx=5)
+        ttk.Button(path_frame, text="浏览...", command=self._choose_output_dir, width=8).pack(side='left', padx=2)
+        ttk.Button(path_frame, text="打开目录", command=self._open_output_dir, width=10).pack(side='left', padx=2)
+
+        # ========== 按钮操作区 ==========
         btn_frame = ttk.Frame(self.root)
-        btn_frame.pack(fill='x', padx=10, pady=5)
+        btn_frame.pack(fill='x', padx=15, pady=5)
         
-        # 左侧操作按钮
-        left_btn_frame = ttk.Frame(btn_frame)
-        left_btn_frame.pack(side='left')
+        ttk.Button(btn_frame, text="➕ 添加文件", command=self._select_files).pack(side='left', padx=3)
+        ttk.Button(btn_frame, text="📁 添加文件夹", command=self._select_folder).pack(side='left', padx=3)
+        ttk.Button(btn_frame, text="🗑 清空列表", command=self._clear_list).pack(side='left', padx=3)
+        ttk.Button(btn_frame, text="❌ 移除选中", command=self._delete_selected).pack(side='left', padx=3)
+        ttk.Button(btn_frame, text="📝 清空日志", command=self._clear_log).pack(side='left', padx=3)
         
-        ttk.Button(left_btn_frame, text="📁 选择文件", command=self._select_files, width=12).pack(side='left', padx=3)
-        ttk.Button(left_btn_frame, text="📂 选择文件夹", command=self._select_folder, width=12).pack(side='left', padx=3)
-        ttk.Button(left_btn_frame, text="🗑 清空列表", command=self._clear_list, width=12).pack(side='left', padx=3)
-        ttk.Button(left_btn_frame, text="❌ 删除选中", command=self._delete_selected, width=12).pack(side='left', padx=3)
-        ttk.Button(left_btn_frame, text="📝 清空日志", command=self._clear_log, width=12).pack(side='left', padx=3)
+        self.stop_btn = ttk.Button(btn_frame, text="⏹ 停止", command=self._stop_compress, state='disabled')
+        self.stop_btn.pack(side='right', padx=3)
         
-        # 右侧压缩按钮
-        self.compress_btn = ttk.Button(btn_frame, text="🚀 开始压缩", command=self._start_compress, width=15)
-        self.compress_btn.pack(side='right', padx=3)
+        self.compress_btn = ttk.Button(btn_frame, text="🚀 开始批量压缩", style='Action.TButton', command=self._start_compress)
+        self.compress_btn.pack(side='right', padx=10)
+
+        # ========== 列表区域 ==========
+        list_frame = ttk.Frame(self.root)
+        list_frame.pack(fill='both', expand=True, padx=15, pady=5)
         
-        # ========== 文件列表区域 ==========
-        list_frame = ttk.LabelFrame(self.root, text="音频文件列表 (支持拖拽上传文件或文件夹)", padding=5)
-        list_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        # 增加参数显示列
+        columns = ('filename', 'orig_format', 'orig_bitrate', 'orig_sample_rate', 'orig_channels', 'orig_size', 'status')
+        self.tree = ttk.Treeview(list_frame, columns=columns, show='headings', selectmode='extended', height=12)
         
-        # 创建Treeview
-        columns = ('filename', 'format', 'bitrate', 'sample_rate', 'bits', 'channels', 'frame_width', 'size', 'status')
-        self.tree = ttk.Treeview(list_frame, columns=columns, show='headings', selectmode='extended', height=10)
+        self.tree.heading('filename', text='文件名', anchor='w')
+        self.tree.heading('orig_format', text='格式', anchor='center')
+        self.tree.heading('orig_bitrate', text='原比特率', anchor='center')
+        self.tree.heading('orig_sample_rate', text='原采样率', anchor='center')
+        self.tree.heading('orig_channels', text='原声道', anchor='center')
+        self.tree.heading('orig_size', text='文件大小', anchor='center')
+        self.tree.heading('status', text='处理状态', anchor='center')
         
-        # 设置列标题和宽度
-        column_config = {
-            'filename': ('文件名', 280),
-            'format': ('格式', 60),
-            'bitrate': ('比特率', 100),
-            'sample_rate': ('采样率', 100),
-            'bits': ('采样宽度', 80),
-            'channels': ('声道数', 60),
-            'frame_width': ('帧宽', 80),
-            'size': ('文件大小', 100),
-            'status': ('状态', 150)
-        }
+        self.tree.column('filename', width=300, anchor='w')
+        self.tree.column('orig_format', width=60, anchor='center')
+        self.tree.column('orig_bitrate', width=80, anchor='center')
+        self.tree.column('orig_sample_rate', width=80, anchor='center')
+        self.tree.column('orig_channels', width=60, anchor='center')
+        self.tree.column('orig_size', width=80, anchor='center')
+        self.tree.column('status', width=220, anchor='center')
         
-        for col, (title, width) in column_config.items():
-            self.tree.heading(col, text=title, anchor='center')
-            self.tree.column(col, width=width, anchor='center', minwidth=50)
+        self.tree.tag_configure('evenrow', background='#f9f9f9')
+        self.tree.tag_configure('oddrow', background='#ffffff')
+        self.tree.tag_configure('success', foreground='#27ae60', font=('Microsoft YaHei', 9, 'bold'))
+        self.tree.tag_configure('error', foreground='#e74c3c')
+        self.tree.tag_configure('processing', foreground='#f39c12')
         
-        # 滚动条
-        scrollbar_y = ttk.Scrollbar(list_frame, orient='vertical', command=self.tree.yview)
-        scrollbar_x = ttk.Scrollbar(list_frame, orient='horizontal', command=self.tree.xview)
-        self.tree.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+        scroll_y = ttk.Scrollbar(list_frame, orient='vertical', command=self.tree.yview)
+        scroll_x = ttk.Scrollbar(list_frame, orient='horizontal', command=self.tree.xview)
+        self.tree.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
         
-        # 布局
-        self.tree.pack(side='left', fill='both', expand=True)
-        scrollbar_y.pack(side='right', fill='y')
+        self.tree.pack(side='top', fill='both', expand=True)
+        scroll_y.pack(side='right', fill='y')
         
         # 拖拽绑定
         self.tree.drop_target_register(DND_FILES)
         self.tree.dnd_bind('<<Drop>>', self._on_drop)
-        self.tree.dnd_bind('<<DragEnter>>', lambda e: self.tree.focus())
         
-        # ========== 日志区域 ==========
-        log_frame = ttk.LabelFrame(self.root, text="压缩日志", padding=5)
-        log_frame.pack(fill='both', expand=True, padx=10, pady=5)
+        # ========== 进度与日志区 ==========
+        bottom_frame = ttk.Frame(self.root)
+        bottom_frame.pack(fill='x', padx=15, pady=10)
         
-        self.log_text = tk.Text(log_frame, height=12, wrap='word', font=('Consolas', 9))
-        log_scrollbar = ttk.Scrollbar(log_frame, orient='vertical', command=self.log_text.yview)
-        self.log_text.configure(yscrollcommand=log_scrollbar.set)
+        # 进度条
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(bottom_frame, orient='horizontal', mode='determinate', variable=self.progress_var)
+        self.progress_bar.pack(fill='x', pady=(0, 5))
         
+        # 状态文本
+        self.status_label = ttk.Label(bottom_frame, text="就绪 | 等待导入文件...", style='Title.TLabel')
+        self.status_label.pack(anchor='w')
+
+        # 日志框
+        log_frame = ttk.LabelFrame(bottom_frame, text=" 运行日志 ", padding=5)
+        log_frame.pack(fill='both', expand=True, pady=5)
+        self.log_text = tk.Text(log_frame, height=8, font=('Consolas', 9), bg='#f8f9fa')
+        log_scroll = ttk.Scrollbar(log_frame, orient='vertical', command=self.log_text.yview)
+        self.log_text.configure(yscrollcommand=log_scroll.set)
         self.log_text.pack(side='left', fill='both', expand=True)
-        log_scrollbar.pack(side='right', fill='y')
+        log_scroll.pack(side='right', fill='y')
         
-        # 配置日志标签颜色
-        self.log_text.tag_configure('info', foreground='#2196F3')
-        self.log_text.tag_configure('success', foreground='#4CAF50')
-        self.log_text.tag_configure('warning', foreground='#FF9800')
-        self.log_text.tag_configure('error', foreground='#F44336')
-        self.log_text.tag_configure('compare', foreground='#9C27B0')
+        self.log_text.tag_configure('info', foreground='#333333')
+        self.log_text.tag_configure('success', foreground='#27ae60')
+        self.log_text.tag_configure('error', foreground='#e74c3c')
+        self.log_text.tag_configure('warning', foreground='#d35400')
+
+    # ================= UI 线程安全更新机制 =================
+    def _process_ui_queue(self):
+        """处理来自子线程的 UI 更新请求"""
+        try:
+            while True:
+                task = self.ui_queue.get_nowait()
+                action = task[0]
+                
+                if action == 'log':
+                    msg, level = task[1], task[2]
+                    self.log_text.insert('end', msg + '\n', level)
+                    self.log_text.see('end')
+                elif action == 'update_tree':
+                    item_id, values, tags = task[1], task[2], task[3]
+                    if self.tree.exists(item_id):
+                        self.tree.item(item_id, values=values, tags=tags)
+                elif action == 'update_progress':
+                    self.completed_count += 1
+                    percent = (self.completed_count / self.total_count) * 100
+                    self.progress_var.set(percent)
+                    self.status_label.config(text=f"进度: {self.completed_count}/{self.total_count} ({percent:.1f}%)")
+                elif action == 'finish':
+                    self._on_compress_finish(task[1], task[2])
+                    
+                self.ui_queue.task_done()
+        except queue.Empty:
+            pass
+        finally:
+            self.root.after(100, self._process_ui_queue)
+
+    def _log_safe(self, message, level='info'):
+        """线程安全的日志记录"""
+        self.ui_queue.put(('log', message, level))
         
-    def _log(self, message, level='info'):
-        """添加日志消息"""
-        self.log_text.insert('end', message + '\n', level)
-        self.log_text.see('end')
-        
-    def _clear_log(self):
-        """清空日志"""
-        self.log_text.delete(1.0, 'end')
-        
+    def _update_tree_safe(self, item_id, values, tags=()):
+        """线程安全的 Treeview 更新"""
+        self.ui_queue.put(('update_tree', item_id, values, tags))
+
+    # ================= 业务逻辑 =================
     def _format_size(self, size_bytes):
-        """格式化文件大小"""
         try:
             size_bytes = float(size_bytes)
             for unit in ['B', 'KB', 'MB', 'GB']:
                 if size_bytes < 1024:
-                    return f"{size_bytes:.2f} {unit}"
+                    return f"{size_bytes:.1f} {unit}"
                 size_bytes /= 1024
-            return f"{size_bytes:.2f} TB"
+            return f"{size_bytes:.1f} TB"
         except:
             return "N/A"
-            
+
     def _get_audio_info(self, filepath):
-        """获取音频文件详细信息"""
+        """使用 mutagen 提取音频参数信息"""
+        info = {
+            'bitrate': '未知',
+            'sample_rate': '未知',
+            'channels': '未知'
+        }
         try:
-            info = {
-                'filepath': filepath,
-                'filename': os.path.basename(filepath),
-                'format': os.path.splitext(filepath)[1][1:].upper(),
-                'bitrate': 'N/A',
-                'sample_rate': 'N/A',
-                'bits_per_sample': 'N/A',
-                'channels': 'N/A',
-                'frame_width': 'N/A',
-                'size': self._format_size(os.path.getsize(filepath)),
-                'size_bytes': os.path.getsize(filepath)
-            }
+            audio = mutagen.File(filepath, easy=True)
+            if audio is not None:
+                audio_info = audio.info
+                if hasattr(audio_info, 'bitrate') and audio_info.bitrate:
+                    info['bitrate'] = f"{int(audio_info.bitrate / 1000)} kbps"
+                if hasattr(audio_info, 'sample_rate') and audio_info.sample_rate:
+                    info['sample_rate'] = f"{int(audio_info.sample_rate)} Hz"
+                if hasattr(audio_info, 'channels'):
+                    info['channels'] = str(audio_info.channels)
+        except Exception:
+            pass
+        return info
+
+    def _build_tree_values(self, info, status):
+        """生成符合 Treeview 列格式的元组"""
+        return (
+            info['filename'], 
+            info['format'], 
+            info.get('bitrate', '未知'),
+            info.get('sample_rate', '未知'),
+            info.get('channels', '未知'),
+            info['size'], 
+            status
+        )
+
+    def _choose_output_dir(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            self.output_dir_var.set(folder)
             
-            # 使用mutagen获取元数据
-            try:
-                audio = mutagen.File(filepath, easy=True)
-                if audio is not None:
-                    audio_info = audio.info
-                    
-                    # 比特率
-                    if hasattr(audio_info, 'bitrate') and audio_info.bitrate:
-                        info['bitrate'] = f"{int(audio_info.bitrate / 1000)} kbps"
-                        info['bitrate_value'] = audio_info.bitrate
-                    
-                    # 采样率
-                    if hasattr(audio_info, 'sample_rate') and audio_info.sample_rate:
-                        info['sample_rate'] = f"{int(audio_info.sample_rate)} Hz"
-                        info['sample_rate_value'] = audio_info.sample_rate
-                    
-                    # 声道数
-                    if hasattr(audio_info, 'channels'):
-                        info['channels'] = str(audio_info.channels)
-                        info['channels_value'] = audio_info.channels
-                    
-                    # 采样宽度 (bits per sample)
-                    if hasattr(audio_info, 'bits_per_sample') and audio_info.bits_per_sample:
-                        info['bits_per_sample'] = f"{audio_info.bits_per_sample} bit"
-                        info['bits_value'] = audio_info.bits_per_sample
-                    elif hasattr(audio_info, 'sample_size') and audio_info.sample_size:
-                        info['bits_per_sample'] = f"{audio_info.sample_size} bit"
-                        info['bits_value'] = audio_info.sample_size
-                    
-                    # 帧宽
-                    if hasattr(audio_info, 'frame_width'):
-                        info['frame_width'] = f"{audio_info.frame_width} bytes"
-                    elif info.get('channels_value') and info.get('bits_value'):
-                        frame_width = info['channels_value'] * info['bits_value'] // 8
-                        info['frame_width'] = f"{frame_width} bytes"
-                        
-            except Exception as e:
-                self._log(f"读取元数据警告 [{os.path.basename(filepath)}]: {str(e)}", 'warning')
-            
-            return info
-            
-        except Exception as e:
-            self._log(f"获取音频信息失败 [{filepath}]: {str(e)}", 'error')
-            return None
-            
+    def _open_output_dir(self):
+        path = self.output_dir_var.get()
+        if os.path.exists(path):
+            os.startfile(path) if sys.platform == 'win32' else subprocess.run(['open', path])
+        else:
+            messagebox.showinfo("提示", "输出目录尚未创建！")
+
     def _add_file(self, filepath):
-        """添加单个文件"""
-        try:
-            filepath = os.path.abspath(filepath)
-            
-            # 检查文件是否存在
-            if not os.path.isfile(filepath):
-                return False
-                
-            # 检查是否已存在
-            if filepath in self.audio_files:
-                return False
-                
-            # 检查格式
-            ext = os.path.splitext(filepath)[1].lower()
-            if ext not in self.SUPPORTED_FORMATS:
-                return False
-            
-            # 获取音频信息
-            info = self._get_audio_info(filepath)
-            if info:
-                self.audio_files[filepath] = info
-                item_id = self.tree.insert('', 'end', values=(
-                    info['filename'],
-                    info['format'],
-                    info['bitrate'],
-                    info['sample_rate'],
-                    info['bits_per_sample'],
-                    info['channels'],
-                    info['frame_width'],
-                    info['size'],
-                    '待压缩'
-                ))
-                info['tree_id'] = item_id
-                return True
+        filepath = os.path.abspath(filepath)
+        if filepath in self.audio_files or not os.path.isfile(filepath):
             return False
             
-        except Exception as e:
-            self._log(f"添加文件失败 [{filepath}]: {str(e)}", 'error')
+        ext = os.path.splitext(filepath)[1].lower()
+        if ext not in self.SUPPORTED_FORMATS:
             return False
             
-    def _add_files(self, filepaths):
-        """批量添加文件"""
-        count = 0
-        for filepath in filepaths:
-            if self._add_file(filepath):
-                count += 1
-        self._log(f"已添加 {count} 个音频文件", 'info')
+        size = os.path.getsize(filepath)
+        audio_params = self._get_audio_info(filepath)
         
-    def _scan_folder(self, folder_path):
-        """递归扫描文件夹中的音频文件"""
-        count = 0
-        try:
-            for root, dirs, files in os.walk(folder_path):
-                for filename in files:
-                    ext = os.path.splitext(filename)[1].lower()
-                    if ext in self.SUPPORTED_FORMATS:
-                        filepath = os.path.join(root, filename)
-                        if self._add_file(filepath):
-                            count += 1
-        except Exception as e:
-            self._log(f"扫描文件夹失败: {str(e)}", 'error')
+        info = {
+            'filepath': filepath,
+            'filename': os.path.basename(filepath),
+            'format': ext[1:].upper(),
+            'size': self._format_size(size),
+            'size_bytes': size,
+            'bitrate': audio_params['bitrate'],
+            'sample_rate': audio_params['sample_rate'],
+            'channels': audio_params['channels']
+        }
         
-        return count
-        
-    def _select_files(self):
-        """选择文件对话框"""
-        filetypes = [
-            ("支持的音频文件", "*.flac *.wav *.mp3"),
-            ("FLAC 文件", "*.flac"),
-            ("WAV 文件", "*.wav"),
-            ("MP3 文件", "*.mp3"),
-            ("所有文件", "*.*")
-        ]
-        filepaths = filedialog.askopenfilenames(filetypes=filetypes)
-        if filepaths:
-            self._add_files(filepaths)
-            
-    def _select_folder(self):
-        """选择文件夹对话框"""
-        folder_path = filedialog.askdirectory()
-        if folder_path:
-            count = self._scan_folder(folder_path)
-            self._log(f"从文件夹中扫描到 {count} 个音频文件", 'info')
-            
-    def _on_drop(self, event):
-        """处理拖拽事件"""
-        try:
-            # 解析拖拽的数据
-            data = event.data
-            # 处理Windows路径格式
-            paths = []
-            
-            # 尝试使用tkinter内置方法分割
-            try:
-                paths = list(self.root.tk.splitlist(data))
-            except:
-                # 手动解析
-                import re
-                paths = re.findall(r'\{([^}]+)\}|(\S+)', data)
-                paths = [p[0] or p[1] for p in paths if p[0] or p[1]]
-            
-            file_count = 0
-            folder_count = 0
-            
-            for path in paths:
-                # 清理路径
-                path = path.strip().strip('{}').strip('"\'')
-                
-                if os.path.isfile(path):
-                    ext = os.path.splitext(path)[1].lower()
-                    if ext in self.SUPPORTED_FORMATS:
-                        if self._add_file(path):
-                            file_count += 1
-                elif os.path.isdir(path):
-                    count = self._scan_folder(path)
-                    if count > 0:
-                        folder_count += 1
-                        file_count += count
-                        
-            if file_count > 0:
-                msg = f"拖拽添加了 {file_count} 个音频文件"
-                if folder_count > 0:
-                    msg += f" (来自 {folder_count} 个文件夹)"
-                self._log(msg, 'info')
-                
-        except Exception as e:
-            self._log(f"拖拽处理错误: {str(e)}", 'error')
-            traceback.print_exc()
-            
-    def _clear_list(self):
-        """清空文件列表"""
-        if self.audio_files:
-            if messagebox.askyesno("确认", "确定要清空文件列表吗？"):
-                self.audio_files.clear()
-                for item in self.tree.get_children():
-                    self.tree.delete(item)
-                self._log("已清空文件列表", 'info')
-                
-    def _delete_selected(self):
-        """删除选中的文件"""
-        selected_items = self.tree.selection()
-        if not selected_items:
-            messagebox.showinfo("提示", "请先选择要删除的文件")
-            return
-            
-        count = len(selected_items)
-        if messagebox.askyesno("确认", f"确定要从列表中删除选中的 {count} 个文件吗？"):
-            for item_id in selected_items:
-                # 查找并删除对应的项目
-                for filepath, info in list(self.audio_files.items()):
-                    if info.get('tree_id') == item_id:
-                        del self.audio_files[filepath]
-                        break
-                self.tree.delete(item_id)
-            self._log(f"已删除 {count} 个选中文件", 'info')
-            
-    def _check_parameters(self):
-        """检查压缩参数，返回是否继续"""
-        user_sr = int(self.sample_rate_var.get())
-        user_br = int(self.bitrate_var.get()) * 1000  # 转换为bps
-        user_ch = int(self.channels_var.get()[0])  # 取数字
-        
-        warnings = []
-        
-        for filepath, info in self.audio_files.items():
-            issues = []
-            
-            # 检查采样率
-            orig_sr = info.get('sample_rate_value', 0)
-            if orig_sr and orig_sr < user_sr:
-                issues.append(f"原采样率({int(orig_sr)}Hz) < 设定值({user_sr}Hz)")
-            
-            # 检查比特率
-            orig_br = info.get('bitrate_value', 0)
-            if orig_br and orig_br < user_br:
-                issues.append(f"原比特率约({int(orig_br/1000)}kbps) < 设定值({int(user_br/1000)}kbps)")
-            
-            # 检查声道
-            orig_ch = info.get('channels_value', 0)
-            if orig_ch and orig_ch < user_ch:
-                issues.append(f"原声道数({orig_ch}) < 设定值({user_ch})")
-                
-            if issues:
-                warnings.append(f"【{info['filename']}】\n  - " + "\n  - ".join(issues))
-        
-        if warnings:
-            warning_msg = "以下音频的原始参数低于设定值:\n\n" + "\n\n".join(warnings[:5])
-            if len(warnings) > 5:
-                warning_msg += f"\n\n... 还有 {len(warnings)-5} 个文件有类似问题"
-            warning_msg += "\n\n是否继续压缩？(将保持原参数或降低参数处理)"
-            
-            return messagebox.askyesno("参数警告", warning_msg)
-            
+        self.audio_files[filepath] = info
+        self._refresh_tree()
         return True
-        
-    def _start_compress(self):
-        """开始压缩"""
-        if not self.audio_files:
-            messagebox.showwarning("提示", "请先添加要压缩的音频文件")
-            return
+
+    def _refresh_tree(self):
+        """重新渲染列表（处理斑马线及全列数据）"""
+        for item in self.tree.get_children():
+            self.tree.delete(item)
             
+        for i, (filepath, info) in enumerate(self.audio_files.items()):
+            tag = 'evenrow' if i % 2 == 0 else 'oddrow'
+            values = self._build_tree_values(info, '等待压缩')
+            item_id = self.tree.insert('', 'end', values=values, tags=(tag,))
+            self.audio_files[filepath]['tree_id'] = item_id
+            
+        self.status_label.config(text=f"已加载 {len(self.audio_files)} 个文件")
+
+    def _add_files(self, filepaths):
+        count = sum(1 for p in filepaths if self._add_file(p))
+        if count > 0: self._log_safe(f"✅ 成功添加 {count} 个文件", 'info')
+
+    def _select_files(self):
+        filepaths = filedialog.askopenfilenames(filetypes=[("音频文件", "*.flac *.wav *.mp3 *.m4a *.aac *.ogg"), ("所有文件", "*.*")])
+        if filepaths: self._add_files(filepaths)
+
+    def _select_folder(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            count = 0
+            for root, _, files in os.walk(folder):
+                for f in files:
+                    if self._add_file(os.path.join(root, f)): count += 1
+            if count > 0: self._log_safe(f"📂 从文件夹导入了 {count} 个文件", 'info')
+
+    def _on_drop(self, event):
+        paths = self.root.tk.splitlist(event.data)
+        file_count = 0
+        for path in paths:
+            if os.path.isfile(path):
+                if self._add_file(path): file_count += 1
+            elif os.path.isdir(path):
+                for root, _, files in os.walk(path):
+                    for f in files:
+                        if self._add_file(os.path.join(root, f)): file_count += 1
+        if file_count > 0: self._log_safe(f"📥 拖拽导入了 {file_count} 个文件", 'info')
+
+    def _clear_list(self):
+        self.audio_files.clear()
+        self._refresh_tree()
+        self._log_safe("🗑 已清空列表")
+
+    def _clear_log(self):
+        """清空日志框内容"""
+        self.log_text.delete(1.0, 'end')
+
+    def _delete_selected(self):
+        selected = self.tree.selection()
+        for item_id in selected:
+            for filepath, info in list(self.audio_files.items()):
+                if info.get('tree_id') == item_id:
+                    del self.audio_files[filepath]
+                    break
+        self._refresh_tree()
+
+    def _stop_compress(self):
         if self.is_compressing:
-            messagebox.showwarning("提示", "正在压缩中，请稍候...")
+            self.cancel_flag = True
+            self.status_label.config(text="正在中止任务，请稍候...")
+            self.stop_btn.config(state='disabled')
+
+    def _start_compress(self):
+        if not self.audio_files:
+            messagebox.showwarning("提示", "请先添加文件！")
             return
             
-        # 检查参数
-        if not self._check_parameters():
+        out_dir = self.output_dir_var.get().strip()
+        if not out_dir:
+            messagebox.showwarning("提示", "请设置输出目录！")
             return
             
-        # 创建输出目录
-        try:
-            self.output_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            messagebox.showerror("错误", f"无法创建输出目录: {str(e)}")
-            return
-            
-        # 禁用按钮，启动压缩线程
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        
         self.is_compressing = True
-        self.compress_btn.configure(state='disabled')
+        self.cancel_flag = False
+        self.compress_btn.config(state='disabled')
+        self.stop_btn.config(state='normal')
         
-        thread = threading.Thread(target=self._compress_all, daemon=True)
-        thread.start()
+        self.total_count = len(self.audio_files)
+        self.completed_count = 0
+        self.progress_var.set(0)
         
-    def _compress_all(self):
-        """压缩所有文件（线程中运行）"""
-        total = len(self.audio_files)
+        self._clear_log()
+        self._log_safe(f"🚀 开始执行并发压缩任务，共 {self.total_count} 个文件...", 'info')
+        self._log_safe(f"目标参数: {self.bitrate_var.get()}kbps | {self.sample_rate_var.get()}Hz | 输出: {out_dir}\n", 'info')
+        
+        # 启动后台主控线程
+        threading.Thread(target=self._run_compression_pool, daemon=True).start()
+
+    def _run_compression_pool(self):
+        """线程池管理器"""
         success_count = 0
         fail_count = 0
         
-        self._log(f"{'='*60}", 'info')
-        self._log(f"开始压缩，共 {total} 个文件", 'info')
-        self._log(f"目标参数: 比特率={self.bitrate_var.get()}kbps, 采样率={self.sample_rate_var.get()}Hz, 声道={self.channels_var.get()}", 'info')
-        self._log(f"输出目录: {self.output_dir}", 'info')
-        self._log(f"{'='*60}", 'info')
+        # 根据CPU核心数动态分配线程，最多开 6 个并发防止卡死机器
+        max_workers = min(os.cpu_count() or 4, 6) 
         
-        for idx, (filepath, info) in enumerate(list(self.audio_files.items()), 1):
-            try:
-                # 更新状态
-                tree_id = info.get('tree_id')
-                if tree_id:
-                    self.tree.item(tree_id, values=(
-                        info['filename'], info['format'], info['bitrate'],
-                        info['sample_rate'], info['bits_per_sample'], info['channels'],
-                        info['frame_width'], info['size'], f"压缩中 ({idx}/{total})"
-                    ))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            for filepath, info in self.audio_files.items():
+                if self.cancel_flag: break
+                futures.append(executor.submit(self._compress_single_task, filepath, info))
                 
-                self._log(f"\n[{idx}/{total}] 正在压缩: {info['filename']}", 'info')
-                
-                # 压缩文件
-                result = self._compress_file(filepath, info)
-                
-                if result:
-                    success_count += 1
-                    if tree_id:
-                        self.tree.item(tree_id, values=(
-                            info['filename'], info['format'], info['bitrate'],
-                            info['sample_rate'], info['bits_per_sample'], info['channels'],
-                            info['frame_width'], info['size'], '✓ 压缩成功'
-                        ), tags=('success',))
-                else:
+            for future in futures:
+                if self.cancel_flag: break
+                try:
+                    result = future.result()
+                    if result: success_count += 1
+                    else: fail_count += 1
+                except Exception as e:
                     fail_count += 1
-                    if tree_id:
-                        self.tree.item(tree_id, values=(
-                            info['filename'], info['format'], info['bitrate'],
-                            info['sample_rate'], info['bits_per_sample'], info['channels'],
-                            info['frame_width'], info['size'], '✗ 压缩失败'
-                        ), tags=('error',))
-                        
-            except Exception as e:
-                fail_count += 1
-                self._log(f"压缩失败: {str(e)}", 'error')
-                traceback.print_exc()
-        
-        # 完成
-        self._log(f"\n{'='*60}", 'info')
-        self._log(f"压缩完成！成功: {success_count}, 失败: {fail_count}", 'success' if fail_count == 0 else 'warning')
-        self._log(f"输出位置: {self.output_dir}", 'info')
-        
-        # 恢复按钮状态
-        self.is_compressing = False
-        self.root.after(0, lambda: self.compress_btn.configure(state='normal'))
-        
-    def _compress_file(self, filepath, orig_info):
-        """使用 FFmpeg 原生命令压缩单个文件"""
-        try:
-            self._log(f"  准备处理...", 'info')
-            
-            # 获取原始参数 (从已解析的 mutagen 信息中拿)
-            orig_sr = orig_info.get('sample_rate_value', 44100)
-            orig_ch = orig_info.get('channels_value', 2)
-            orig_sw_bits = orig_info.get('bits_value', 16)
-            orig_size = orig_info.get('size_bytes', 0)
-            
-            # 获取用户设置参数
-            user_sr = int(self.sample_rate_var.get())
-            user_br = self.bitrate_var.get()
-            user_ch = int(self.channels_var.get()[0])
-            
-            # 智能调整参数（不提升原始参数，防止体积反向增加）
-            target_sr = min(orig_sr, user_sr) if orig_sr else user_sr
-            target_ch = min(orig_ch, user_ch) if orig_ch else user_ch
-            
-            self._log(f"  原始参数: {orig_sr}Hz, {orig_ch}声道, {orig_sw_bits}bit, {self._format_size(orig_size)}", 'info')
-            self._log(f"  目标参数: {target_sr}Hz, {target_ch}声道, {user_br}kbps", 'info')
-            
-            # 生成输出文件名
-            base_name = os.path.splitext(orig_info['filename'])[0]
-            output_name = f"{base_name}.mp3"
-            output_path = self.output_dir / output_name
-            
-            # 处理重名
-            counter = 1
-            while output_path.exists():
-                output_name = f"{base_name}_{counter}.mp3"
-                output_path = self.output_dir / output_name
-                counter += 1
-            
-            self._log(f"  正在调用 FFmpeg 编码MP3...", 'info')
-            
-            # 构建FFmpeg命令
-            ffmpeg_cmd = [
-                "ffmpeg",
-                "-y",                   # 覆盖输出文件
-                "-i", str(filepath),    # 输入文件
-                "-ar", str(target_sr),  # 采样率
-                "-ac", str(target_ch),  # 声道数
-                "-b:a", f"{user_br}k",  # 比特率 (恒定比特率CBR)
-                "-map_metadata", "0",   # 保留原始元数据标签
-                str(output_path)        # 输出文件
-            ]
-            
-            # 隐藏 Windows 弹出的黑色 CMD 窗口
-            creationflags = 0
-            if sys.platform == "win32":
-                creationflags = subprocess.CREATE_NO_WINDOW
+                    self._log_safe(f"未知异常: {str(e)}", 'error')
                 
-            # 执行压缩
-            process = subprocess.run(
-                ffmpeg_cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE, 
-                text=True,
-                creationflags=creationflags
-            )
+                self.ui_queue.put(('update_progress',))
+
+        self.ui_queue.put(('finish', success_count, fail_count))
+
+    def _compress_single_task(self, filepath, info):
+        """在工作线程中执行 FFmpeg 调用"""
+        if self.cancel_flag:
+            return False
             
-            # 检查 FFmpeg 执行结果
+        tree_id = info.get('tree_id')
+        filename = info['filename']
+        self._update_tree_safe(tree_id, self._build_tree_values(info, "🔄 处理中..."), ('processing',))
+        
+        out_dir = Path(self.output_dir_var.get())
+        base_name = os.path.splitext(filename)[0]
+        out_path = out_dir / f"{base_name}.mp3"
+        
+        # 处理重名
+        counter = 1
+        while out_path.exists():
+            out_path = out_dir / f"{base_name}_{counter}.mp3"
+            counter += 1
+
+        cmd = [
+            "ffmpeg", "-y", "-v", "error",
+            "-i", str(filepath),
+            "-ar", self.sample_rate_var.get(),
+            "-ac", str(int(self.channels_var.get()[0])),
+            "-b:a", f"{self.bitrate_var.get()}k",
+            "-map_metadata", "0", 
+            "-id3v2_version", "3", # 修复Windows下MP3封面和歌手不显示的问题
+            str(out_path)
+        ]
+
+        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        
+        try:
+            start_time = time.time()
+            process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=creationflags)
+            
             if process.returncode != 0:
-                self._log(f"  ✗ FFmpeg 错误日志: {process.stderr}", 'error')
+                self._update_tree_safe(tree_id, self._build_tree_values(info, "❌ 失败"), ('error',))
+                self._log_safe(f"[{filename}] FFmpeg 报错: {process.stderr.strip()}", 'error')
                 return False
+                
+            cost_time = time.time() - start_time
+            new_size = os.path.getsize(out_path)
+            orig_size = info['size_bytes']
+            ratio = (1 - new_size/orig_size)*100 if orig_size > 0 else 0
             
-            # 获取压缩后文件信息
-            new_size = os.path.getsize(output_path)
-            new_info = self._get_audio_info(str(output_path))
-            
-            # 计算压缩率
-            compression_ratio = (1 - new_size / orig_size) * 100 if orig_size > 0 else 0
-            
-            # 显示对比信息
-            self._log(f"  " + "─"*50, 'compare')
-            self._log(f"  │ 项目       │ 原始值           │ 压缩后           │", 'compare')
-            self._log(f"  ├────────────┼──────────────────┼──────────────────│", 'compare')
-            self._log(f"  │ 文件大小   │ {self._format_size(orig_size):>16} │ {self._format_size(new_size):>16} │", 'compare')
-            self._log(f"  │ 采样率     │ {orig_sr:>14} Hz │ {new_info.get('sample_rate', 'N/A'):>16} │", 'compare')
-            self._log(f"  │ 声道数     │ {orig_ch:>16} │ {new_info.get('channels', 'N/A'):>16} │", 'compare')
-            self._log(f"  │ 比特率     │ {orig_info.get('bitrate', 'N/A'):>16} │ {new_info.get('bitrate', 'N/A'):>16} │", 'compare')
-            self._log(f"  │ 采样宽度   │ {orig_sw_bits:>14} bit │ {new_info.get('bits_per_sample', 'N/A'):>16} │", 'compare')
-            self._log(f"  └────────────┴──────────────────┴──────────────────┘", 'compare')
-            self._log(f"  压缩率: {compression_ratio:.1f}%", 'success' if compression_ratio > 0 else 'warning')
-            self._log(f"  输出文件: {output_name}", 'success')
-            
+            status_text = f"✅ 完成 ({self._format_size(new_size)} | 压缩率: {ratio:.1f}% | 耗时:{cost_time:.1f}s)"
+            # 更新列表格式：格式改为 MP3，大小保持原样以作对比，状态更新为成功
+            finished_info = info.copy()
+            finished_info['format'] = "MP3"
+            self._update_tree_safe(tree_id, self._build_tree_values(finished_info, status_text), ('success',))
+            self._log_safe(f"✓ 成功: {filename} -> {status_text}", 'success')
             return True
             
         except Exception as e:
-            self._log(f"  ✗ 压缩失败: {str(e)}", 'error')
-            traceback.print_exc()
+            self._update_tree_safe(tree_id, self._build_tree_values(info, "❌ 异常"), ('error',))
+            self._log_safe(f"[{filename}] 程序异常: {str(e)}", 'error')
             return False
 
-
-def main():
-    """主函数"""
-    try:
-        # 创建主窗口
-        root = TkinterDnD.Tk()
+    def _on_compress_finish(self, success, fail):
+        """恢复UI状态"""
+        self.is_compressing = False
+        self.compress_btn.config(state='normal')
+        self.stop_btn.config(state='disabled')
         
-        # 设置窗口图标（如果存在）
-        try:
-            root.iconbitmap(default='')
-        except:
-            pass
-            
-        # 检查ffmpeg并进行可视化提醒
-        if shutil.which("ffmpeg") is None:
-            messagebox.showwarning(
-                "缺少 ffmpeg 组件", 
-                "未检测到 ffmpeg 工具！\n\n【必须配置】程序依赖 FFmpeg 进行音频压缩。\n\n解决办法：\n请确保 ffmpeg.exe 放在本脚本同级目录下，或将其添加到系统环境变量 PATH 中。"
-            )
-        
-        # 创建应用
-        app = AudioCompressorApp(root)
-        
-        # 居中显示窗口
-        root.update_idletasks()
-        width = root.winfo_width()
-        height = root.winfo_height()
-        x = (root.winfo_screenwidth() // 2) - (width // 2)
-        y = (root.winfo_screenheight() // 2) - (height // 2)
-        root.geometry(f'{width}x{height}+{x}+{y}')
-        
-        # 运行主循环
-        root.mainloop()
-        
-    except Exception as e:
-        # 如果是 tkdnd 注册失败等运行时错误，通过弹窗显示
-        temp_root = tk.Tk()
-        temp_root.withdraw()
-        messagebox.showerror("程序崩溃", f"运行时发生严重错误：\n{str(e)}\n\n请检查tkinterdnd2是否正确安装。")
-        sys.exit(1)
+        if self.cancel_flag:
+            self.status_label.config(text="任务已用户中止")
+            messagebox.showinfo("中止", "压缩任务已被手动中止。")
+        else:
+            self.status_label.config(text=f"完成！成功: {success} 个，失败: {fail} 个")
+            messagebox.showinfo("处理完成", f"批量处理结束！\n成功: {success}\n失败: {fail}")
 
 
 if __name__ == '__main__':
-    main()
+    root = TkinterDnD.Tk()
+    
+    if shutil.which("ffmpeg") is None:
+        messagebox.showerror("缺少组件", "未检测到 FFmpeg！\n请将 ffmpeg.exe 放入当前文件夹或加入环境变量。")
+        sys.exit(1)
+        
+    app = AudioCompressorApp(root)
+    root.update_idletasks()
+    x = (root.winfo_screenwidth() - root.winfo_width()) // 2
+    y = (root.winfo_screenheight() - root.winfo_height()) // 2
+    root.geometry(f'+{x}+{y}')
+    root.mainloop()
