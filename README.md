@@ -19,28 +19,20 @@
 
 ## 🚀 工具列表
 
-| 工具名称  | 核心功能 | 技术栈 |
-| :--- | :--- | :--- |
-| **🎤 音视频转文本** | <i class="fa-solid fa-microphone-lines"></i> | 基于 Whisper 的本地智能转录，支持视频/音频批量处理 | Whisper, PyTorch, tkinterdnd2 |
-| **🖼️ GIF 压缩工具** | <i class="fa-solid fa-file-image"></i> | 多线程 GIF 动图压缩，保留动画质量 | Pillow, TkinterDnD, 多线程 |
-| **🎭 角色卡提取工具** | <i class="fa-solid fa-masks-theater"></i> | 解析酒馆角色卡图片，提取结构化 JSON 数据 | Pillow, Base64解码, 正则扫描 |
-| **📷 图片压缩处理** | <i class="fa-regular fa-image"></i> | 批量图片格式转换、分辨率缩放、画质压缩 | Pillow, TkinterDnD, 多线程 |
-| **🎬 视频音频提取** | <i class="fa-solid fa-photo-film"></i> | 从视频中提取高质量音频（MP3/WAV） | MoviePy, TkinterDnD, 多线程 |
-| **🎵 极速音频压缩** | <i class="fa-solid fa-file-audio"></i> | 基于 FFmpeg 的多线程音频批量压缩 | FFmpeg, mutagen, 多线程并发 |
-| **🏷️ 音乐标签清除** | <i class="fa-solid fa-compact-disc"></i> | 彻底清除音频文件元数据标签 | PySide6, Mutagen, 多线程 |
-| **📄 文件转 Markdown** | <i class="fa-brands fa-markdown"></i> | 将 Word/PDF/Excel 等文档转为 Markdown | python-docx, PyPDF2, pandas |
-| **🎥 视频批量压缩** | <i class="fa-solid fa-video"></i> | 支持硬件加速的视频压缩，自定义参数 | FFmpeg, NVIDIA NVENC, 多线程 |
+| 工具名称 | 核心功能 | 技术栈 | 界面预览 |
+| :--- | :--- | :--- | :--- |
+| **🎤 音视频转文本** | 基于本地化部署的 Whisper 模型构建的智能转录工具，支持数十种音视频格式，支持拖拽及批量处理。 | Whisper, PyTorch, tkinterdnd2 | ![音视频转文本界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-yw.png) |
+| **🖼️ GIF 压缩工具** | 一款基于 Pillow 和 Tkinter 的多线程 GIF 动图压缩工具。支持文件拖拽导入、全局与单文件独立压缩率调节，有效减小体积并保留帧动画。 | Pillow, TkinterDnD, 多线程异步, 自适应调色板 | ![GIF压缩界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-gif.png) |
+| **🎭 角色卡提取工具** | 一款强大的酒馆角色卡解析工具。支持拖拽批量处理，通过解析图片元数据及底层二进制扫描，极速提取隐写的 Base64 数据并转换为结构化 JSON。 | Pillow解析, Base64解码, 正则扫描, TkinterDnD | ![角色卡提取界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-jg.png) |
+| **📷 图片压缩处理** | 一款功能强大的本地图片批量处理工具。支持格式互转、分辨率缩放、画质压缩，支持鼠标拖拽与多线程极速处理。 | Pillow, TkinterDnD, 多线程, 批量转换 | ![图片压缩界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-ty.png) |
+| **🎬 视频音频提取工具** | 一款高效的视频转音频桌面应用，支持批量拖拽处理。一键读取十余种视频格式，并提取为高品质 MP3 或 WAV。 | MoviePy, TkinterDnD, 多线程异步, 批量处理 | ![视频音频提取界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-sy.png) |
+| **🎵 极速音频压缩工具** | 基于 FFmpeg 引擎的极速音频批量压缩工具。支持多线程并发、拖拽导入，可自定义比特率、采样率与声道，在体积与音质间寻找完美平衡。 | FFmpeg, 多线程并发, TkinterDnD | ![音频压缩界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-yy.png) |
+| **🏷️ 音乐标签清除** | 极简高效的音乐元数据清除工具。支持批量拖拽导入，一键去除音频文件中的广告标签或乱码，生成纯净版音频。 | PySide6, Mutagen, 多线程, 无损处理 | ![音乐标签清除界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-yb.png) |
+| **📄 通用文件转 Markdown 工具** | 支持将数十种文档（Word, PDF, Excel等）和代码文件快速转换为 Markdown 格式，支持拖拽与批量处理。 | 文档解析, 多格式转换, 多线程, 自动化排版 | ![文件转Markdown界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-md.png) |
+| **🎥 视频批量压缩工具** | 一款基于 FFmpeg 的强大的视频批量压缩桌面端工具。支持硬件加速、拖拽导入、自定义分辨率与帧率，在画质与体积之间取得完美平衡。 | FFmpeg, TkinterDnD, 显卡加速, 多线程异步 | ![视频压缩界面](https://moyermusic.cn/moyer-space-cover/python-cover/py-sys.png) |
 
 ---
 
-## 🖼️ 图片展示
-> **提示**：为获得最佳浏览体验，所有工具的界面截图、操作演示和效果对比图均已集成到在线演示网站中。
-### 📱 查看方式
-1. **访问在线演示网站**：[https://moshidi244262.github.io/Python-Tools/](https://moshidi244262.github.io/Python-Tools/)
-2. **点击任意工具的"详细介绍"按钮**
-3. **在弹出窗口中查看"界面预览"部分**
-4. **支持点击图片全屏查看高清大图**
----
 ## ✨ 核心特性
 
 ### 🎯 **用户体验优先**
