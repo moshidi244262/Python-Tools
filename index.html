@@ -160,12 +160,30 @@
         // 工具数据字典 (已添加 longDesc 和 features 以供详情页展示)
         const toolsData = [
             {
+                id: 'audio-text',
+                title: 'Whisper 音视频转文本 Pro Max',
+                icon: 'fa-solid fa-microphone-lines text-emerald-400',
+                desc: '基于本地化部署的 Whisper 模型构建的智能转录工具，支持数十种音视频格式，支持拖拽及批量处理。',
+                longDesc: '告别手动听打！这是一款强大的本地音视频转文本桌面应用。不仅支持纯音频，还能直接解析 MP4、MKV 等视频文件中的音频流。工具完全离线运行，隐私安全。该版本新增了 GPU 加速检测、多格式导出(TXT/SRT/LRC)，以及初始提示词防繁体字等贴心功能。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yw.png', 
+                features: [
+                    '支持 GPU 加速，大幅提升长视频/音频的转录速度',
+                    '支持导出纯文本(TXT)、标准字幕(SRT)和歌词(LRC)格式',
+                    '提供 tiny 到 turbo 多种模型切换，平衡速度与精度',
+                    '支持鼠标拖拽，一键批量处理文件和文件夹',
+                    '内置初始提示词设置，可有效减少 AI 繁体字输出'
+                ],
+                tags: ['Whisper', '语音识别', 'PyTorch'],
+                sourceFolder: '音频转文本',
+                mainFile: 'audio-to-txt.py'
+            },
+            {
                 id: 'gif-compress',
                 title: 'GIF 图压缩工具 v1.1',
                 icon: 'fa-solid fa-file-image text-pink-400',
                 desc: '智能压缩GIF图片体积。支持批量拖拽，全局/自定义压缩比率调节，自动保留动画帧结构。基于 Pillow 库开发。',
                 longDesc: '这是一款基于 Python 和 Pillow 图像处理库开发的轻量级桌面端 GIF 压缩工具。主要解决日常中表情包、网页动图过大无法上传平台的问题。它通过智能减少颜色表和抽帧技术，在肉眼几乎看不出画质损失的情况下，将文件体积缩减到极致。',
-                imageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80', // 示例图片，请替换为你的七牛云链接
+                imageUrl: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80', 
                 features: [
                     '支持鼠标拖拽批量导入文件',
                     '提供全局统一压缩率和单文件独立调节',
@@ -182,7 +200,7 @@
                 icon: 'fa-solid fa-masks-theater text-purple-400',
                 desc: '将包含角色信息的PNG/WEBP角色卡图，通过Base64解码快速提取并转换为结构化的JSON格式数据。',
                 longDesc: '专门为 AI 角色扮演爱好者（酒馆/Tavern 用户）开发的解析工具。在 AI 社区中，角色设定往往被隐写在图片文件的EXIF或附属数据中。本工具能够深入解析图片二进制流，将其中的设定数据完整提取，并转换为前端或其它引擎容易读取的标准 JSON 配置格式。',
-                imageUrl: '', // 将后续上传好的七牛云图片链接粘贴到这里
+                imageUrl: '', 
                 features: [
                     '支持 PNG 和 WEBP 两种主流角色卡格式',
                     '自动定位并解码 Base64 隐写数据',
@@ -205,17 +223,6 @@
                 mainFile: 'comperss-p.py'
             },
             {
-                id: 'audio-text',
-                title: '音频转文本 (STT)',
-                icon: 'fa-solid fa-microphone-lines text-emerald-400',
-                desc: '结合语音识别模型，将本地音频文件快速提取为文稿内容，支持长语音分段处理。',
-                longDesc: '告别手动听打！该工具集成了优秀的语音识别技术，可以离线或调用API将会议录音、采访录音转化为带有标点符号的纯文本。内建了静音分段逻辑，能够稳定处理长达数小时的超大音频文件，不会因为内存溢出而崩溃。',
-                features: ['智能断句与标点符号自动推断', '超长音频自动切片识别', '支持 MP3, WAV, M4A 常见格式', '导出为 TXT 或 Markdown 格式'],
-                tags: ['语音识别', 'AI应用'],
-                sourceFolder: '音频转文本',
-                mainFile: 'audio-to-txt.py'
-            },
-            {
                 id: 'video-audio',
                 title: '视频转音频提取器',
                 icon: 'fa-solid fa-photo-film text-orange-400',
@@ -228,12 +235,19 @@
             },
             {
                 id: 'audio-compress',
-                title: '音频压缩瘦身',
+                title: '极速音频压缩工具 v2.1',
                 icon: 'fa-solid fa-file-audio text-yellow-400',
-                desc: '在尽量不损失人耳听觉质量的前提下，通过降低比特率等方式大幅压缩音频文件大小。',
-                longDesc: '随着高解析度音频的普及，手机或播放器的存储空间经常告急。本工具通过重采样和智能比特率控制（VBR/CBR），可以在体积与音质之间找到完美的平衡点，非常适合制作适用于网页加载的轻量级音频。',
-                features: ['自定义采样率 (44100Hz, 48000Hz等)', '支持单声道与双声道转换', '多线程并发压缩', '体积减小率预估'],
-                tags: ['音频编码', '批量化'],
+                desc: '基于 FFmpeg 引擎的极速音频批量压缩工具。支持多线程并发、拖拽导入，可自定义比特率、采样率与声道，在体积与音质间寻找完美平衡。',
+                longDesc: '随着高解析度音频的普及，设备的存储空间经常告急。本工具底层调用强大的 FFmpeg 引擎，结合多线程并发处理技术，为您提供极速的音频批量压缩体验。通过读取 mutagen 提取原音频元数据，实时比对压缩前后的体积与压缩率。不仅支持拖拽批量导入，还能精确调节输出的比特率 (64-320kbps)、采样率及声道，完美解决网页端加载过慢或本地存储不足的问题。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yy.png',
+                features: [
+                    '底层集成 FFmpeg 引擎，支持多种主流音频格式 (.flac, .wav, .mp3, .m4a 等)',
+                    '支持多线程并发处理（动态分配 CPU 核心），大幅提升批量压缩速度',
+                    '参数高度自定义：灵活调节输出比特率、采样率及单/双声道模式',
+                    '智能解析音频元数据，直观展示原始参数、压缩后大小与实时压缩比率',
+                    '支持鼠标拖拽文件或文件夹批量导入，内置实时进度条与详细运行日志'
+                ],
+                tags: ['FFmpeg', '多线程并发', 'TkinterDnD'],
                 sourceFolder: '音频压缩',
                 mainFile: 'audio-comperss.py'
             },
