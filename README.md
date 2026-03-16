@@ -121,6 +121,7 @@ python 主程序文件.py
 Python-Tools/
 ├── index.html                    # 主展示网站
 ├── README.md                     # 项目说明文档
+├── LICENSE                       # 许可证 
 ├── 音频转文本/                   # 工具1：音视频转文本
 │   └── audio-to-txt.py
 ├── Gif图压缩/                    # 工具2：GIF压缩
