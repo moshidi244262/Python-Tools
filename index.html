@@ -99,7 +99,7 @@
             </p>
             <div class="flex flex-wrap justify-center gap-4">
                 <span class="px-4 py-1.5 rounded-full bg-blue-900/30 text-blue-300 border border-blue-800/50 text-sm"><i class="fa-solid fa-code mr-2"></i>Python 3</span>
-                <span class="px-4 py-1.5 rounded-full bg-purple-900/30 text-purple-300 border border-purple-800/50 text-sm"><i class="fa-solid fa-window-maximize mr-2"></i>Tkinter GUI</span>
+                <span class="px-4 py-1.5 rounded-full bg-purple-900/30 text-purple-300 border border-purple-800/50 text-sm"><i class="fa-solid fa-window-maximize mr-2"></i>GUI 应用</span>
                 <span class="px-4 py-1.5 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-800/50 text-sm"><i class="fa-solid fa-bolt mr-2"></i>开箱即用</span>
             </div>
         </div>
@@ -166,6 +166,7 @@
                 desc: '基于本地化部署的 Whisper 模型构建的智能转录工具，支持数十种音视频格式，支持拖拽及批量处理。',
                 longDesc: '告别手动听打！这是一款强大的本地音视频转文本桌面应用。不仅支持纯音频，还能直接解析 MP4、MKV 等视频文件中的音频流。工具完全离线运行，隐私安全。该版本新增了 GPU 加速检测、多格式导出(TXT/SRT/LRC)，以及初始提示词防繁体字等贴心功能。',
                 imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yw.png', 
+                installCmd: 'pip install openai-whisper tkinterdnd2 torch', // 运行库依赖命令
                 features: [
                     '支持 GPU 加速，大幅提升长视频/音频的转录速度',
                     '支持导出纯文本(TXT)、标准字幕(SRT)和歌词(LRC)格式',
@@ -240,6 +241,7 @@
                 desc: '基于 FFmpeg 引擎的极速音频批量压缩工具。支持多线程并发、拖拽导入，可自定义比特率、采样率与声道，在体积与音质间寻找完美平衡。',
                 longDesc: '随着高解析度音频的普及，设备的存储空间经常告急。本工具底层调用强大的 FFmpeg 引擎，结合多线程并发处理技术，为您提供极速的音频批量压缩体验。通过读取 mutagen 提取原音频元数据，实时比对压缩前后的体积与压缩率。不仅支持拖拽批量导入，还能精确调节输出的比特率 (64-320kbps)、采样率及声道，完美解决网页端加载过慢或本地存储不足的问题。',
                 imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yy.png',
+                installCmd: 'pip install mutagen tkinterdnd2', // 运行库依赖命令
                 features: [
                     '底层集成 FFmpeg 引擎，支持多种主流音频格式 (.flac, .wav, .mp3, .m4a 等)',
                     '支持多线程并发处理（动态分配 CPU 核心），大幅提升批量压缩速度',
@@ -253,12 +255,20 @@
             },
             {
                 id: 'music-tag',
-                title: '音乐标签去除工具',
+                title: '音乐标签极净清除工具 v3.1',
                 icon: 'fa-solid fa-compact-disc text-teal-400',
-                desc: '快速清除MP3等音乐文件中的广告标签、乱码元数据，还你一个干净的音乐库。',
-                longDesc: '网上下载的音乐经常附带着某某论坛的网址、不相关的专辑封面或乱码的歌手名。这个脚本利用 mutagen 库深入解析音频文件的 ID3 标签，支持一键清空所有非必要元数据，或者根据正则表达式批量修改标签，强迫症患者的福音。',
-                features: ['彻底擦除 ID3v1/ID3v2, APEv2 标签', '支持移除内嵌的无用专辑封面', '重置标题、艺术家、专辑字段', '安全模式：修改前自动备份'],
-                tags: ['ID3解析', '元数据修改'],
+                desc: '极简高效的音乐元数据清除工具。支持批量拖拽导入，一键去除音频文件中的广告标签或乱码，生成纯净版音频。',
+                longDesc: '这是一款基于 PySide6 和 Mutagen 开发的现代化桌面端工具，专门用于彻底清除音乐文件中的元数据（如 ID3、APEv2 等标签）。网上下载的音乐常带有广告网址、杂乱的封面或乱码信息，本工具可帮您一键提取纯净音频。程序采用多线程无损处理机制，自动在原目录创建“去标签音乐”文件夹并复制处理，绝不覆盖您的原始文件。',
+                imageUrl: 'https://moyermusic.cn/moyer-space-cover/python-cover/py-yb.png',
+                installCmd: 'pip install PySide6 mutagen', // 运行库依赖命令
+                features: [
+                    '深度清理：基于 mutagen 库彻底擦除各类音频元数据标签',
+                    '无损安全：自动复制并处理，保留原文件不动，杜绝文件损坏风险',
+                    '格式丰富：支持 MP3, WAV, FLAC, M4A, OGG, WMA, AAC 等主流音频格式',
+                    '便捷操作：支持鼠标拖拽文件/文件夹批量加入队列，提供详细实时日志',
+                    '现代界面：基于 PySide6 构建的卡片式美观 UI，多线程处理拒绝界面卡顿'
+                ],
+                tags: ['PySide6', 'Mutagen', '多线程', '无损处理'],
                 sourceFolder: '音乐标签去除工具',
                 mainFile: 'audio-label.py'
             },
@@ -315,7 +325,7 @@
                 </button>
 
                 <div class="flex items-center space-x-4 mb-4 z-10 pr-24">
-                    <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 shrink-0">
+                    <div class="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 shadow-inner shrink-0">
                         <i class="${tool.icon} text-2xl"></i>
                     </div>
                     <h3 class="text-xl font-bold text-slate-100">${tool.title}</h3>
@@ -343,6 +353,36 @@
             
             grid.appendChild(card);
         });
+
+        // 复制命令功能函数
+        function copyInstallCmd(btnElement, cmdText) {
+            // 使用临时文本域方式，兼容性最佳 (包括在 iframe 中)
+            const textArea = document.createElement("textarea");
+            textArea.value = cmdText;
+            textArea.style.position = "fixed";
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                // 成功后按钮交互反馈
+                const originalHtml = btnElement.innerHTML;
+                btnElement.innerHTML = '<i class="fa-solid fa-check mr-1.5"></i>已复制';
+                btnElement.classList.replace('text-slate-400', 'text-emerald-400');
+                btnElement.classList.replace('hover:text-white', 'hover:text-emerald-300');
+                
+                setTimeout(() => {
+                    btnElement.innerHTML = originalHtml;
+                    btnElement.classList.replace('text-emerald-400', 'text-slate-400');
+                    btnElement.classList.replace('hover:text-emerald-300', 'hover:text-white');
+                }, 2000);
+            } catch (err) {
+                console.error('复制失败', err);
+            }
+            document.body.removeChild(textArea);
+        }
 
         // 模态框逻辑
         const modal = document.getElementById('detail-modal');
@@ -372,6 +412,30 @@
                                     <span class="text-slate-300 text-sm leading-snug">${f}</span>
                                 </div>
                             `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 新增：构建运行库依赖 HTML
+            let installHtml = '';
+            if (tool.installCmd) {
+                installHtml = `
+                    <div class="mt-6">
+                        <h4 class="text-lg font-semibold text-white mb-3 flex items-center">
+                            <i class="fa-solid fa-box-archive text-emerald-400 mr-2"></i>运行库依赖
+                        </h4>
+                        <div class="bg-slate-900/80 rounded-xl border border-slate-700/50 p-4">
+                            <div class="flex items-center justify-between bg-slate-950/50 rounded-lg p-3 border border-slate-800">
+                                <code class="text-emerald-300 font-mono text-sm break-all">${tool.installCmd}</code>
+                                <button onclick="copyInstallCmd(this, '${tool.installCmd}')" class="text-slate-400 hover:text-white transition-colors flex items-center text-sm ml-4 shrink-0 bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-md border border-slate-600">
+                                    <i class="fa-regular fa-copy mr-1.5"></i>复制
+                                </button>
+                            </div>
+                            <p class="text-slate-400 text-xs mt-3 flex items-start leading-relaxed">
+                                <i class="fa-solid fa-circle-info text-blue-400 mt-0.5 mr-1.5 shrink-0"></i>
+                                <span>温馨提示：请在系统终端 (CMD 或 Terminal) 中运行上述命令安装依赖。<br/>若该运行库已安装则可以跳过，即使重复安装也没问题（系统会自动提示已满足依赖条件）。</span>
+                            </p>
                         </div>
                     </div>
                 `;
@@ -430,6 +494,9 @@
 
                 <!-- 功能特性 -->
                 ${featuresHtml}
+
+                <!-- 运行库依赖板块 -->
+                ${installHtml}
 
                 <!-- 底部按钮 -->
                 <div class="mt-8 flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-700/50">
