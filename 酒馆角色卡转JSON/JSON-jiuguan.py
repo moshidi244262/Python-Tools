@@ -1,65 +1,144 @@
 # 依赖安装: pip install Pillow tkinterdnd2
-
 import os
+import sys
 import json
 import base64
-import tkinter as tk
-from tkinter import filedialog, messagebox, scrolledtext
 import threading
 import re
-from PIL import Image
-from tkinterdnd2 import TkinterDnD, DND_FILES
+import tkinter as tk
+from tkinter import filedialog, messagebox, scrolledtext
+from tkinter import ttk
 
-# 配置常量
-OUTPUT_DIR = r"C:\Users\24426\Desktop\Py工具\酒馆角色卡转JSON\角色信息"
+# ==========================================
+# 依赖检查放在最顶部，防止未安装库直接崩溃
+# ==========================================
+try:
+    from PIL import Image
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+except ImportError as e:
+    # 如果是用python直接运行，弹窗提示
+    root = tk.Tk()
+    root.withdraw()
+    messagebox.showerror(
+        "缺少依赖", 
+        f"运行程序缺少必要的库: {e}\n\n请打开终端(CMD/PowerShell)运行以下命令安装:\n\npip install Pillow tkinterdnd2"
+    )
+    sys.exit(1)
 
+# ==========================================
+# 核心逻辑类
+# ==========================================
 class CharacterCardExtractor:
     def __init__(self, root):
         self.root = root
-        self.root.title("酒馆角色卡信息提取工具 v2.0 (修复版)")
-        self.root.geometry("800x600")
+        self.root.title("酒馆角色卡数据提取工具 v3.0 (增强美化版)")
+        self.root.geometry("850x650")
+        self.root.minsize(700, 500)
         
-        # 确保输出目录存在
-        try:
-            if not os.path.exists(OUTPUT_DIR):
-                os.makedirs(OUTPUT_DIR)
-                self.log(f"已创建输出目录: {OUTPUT_DIR}")
-        except Exception as e:
-            messagebox.showerror("错误", f"无法创建输出目录: {e}")
-            root.destroy()
-            return
+        # 初始化默认输出路径 (当前脚本所在目录的子文件夹)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.output_dir = tk.StringVar(value=os.path.join(base_dir, "输出_角色数据"))
+        
+        # 状态变量
+        self.is_processing = False
+        
+        self.setup_ui()
+        self.ensure_output_dir()
 
-        # --- UI 布局 ---
-        # 顶部按钮区
-        btn_frame = tk.Frame(root)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+    def setup_ui(self):
+        """配置并初始化现代化的 UI 界面"""
+        # 设置 ttk 主题
+        style = ttk.Style(self.root)
+        # 尝试使用系统中比较现代的主题
+        themes = style.theme_names()
+        if 'clam' in themes:
+            style.theme_use('clam')
+        
+        # 自定义样式
+        style.configure('TButton', font=('Microsoft YaHei', 10), padding=5)
+        style.configure('Header.TLabel', font=('Microsoft YaHei', 12, 'bold'))
+        style.configure('DropZone.TFrame', background='#e3f2fd')
+        
+        # 主框架
+        main_frame = ttk.Frame(self.root, padding=15)
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        tk.Button(btn_frame, text="选择文件 (支持多选)", command=self.select_files, width=20).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="选择文件夹 (递归)", command=self.select_folder, width=20).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="清空日志", command=self.clear_log, width=10).pack(side=tk.RIGHT, padx=5)
+        # 1. 顶部路径设置区
+        path_frame = ttk.LabelFrame(main_frame, text=" 💾 输出设置 ", padding=10)
+        path_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        ttk.Entry(path_frame, textvariable=self.output_dir, state='readonly', font=('Consolas', 10)).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        ttk.Button(path_frame, text="更改目录", command=self.change_output_dir, width=10).pack(side=tk.LEFT, padx=5)
+        ttk.Button(path_frame, text="打开文件夹", command=self.open_output_dir, width=12).pack(side=tk.LEFT, padx=5)
 
-        # 拖拽提示区
-        # 注意：为了拖拽稳定，我们将整个窗口背景或一个大控件作为拖放区
-        self.drop_label = tk.Label(root, text="👇 将角色卡文件或文件夹拖拽到此处 👇", bg="#e1f5fe", font=("Arial", 14), height=2, relief="groove")
-        self.drop_label.pack(fill=tk.X, padx=10, pady=5)
+        # 2. 核心操作按钮区
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        ttk.Button(btn_frame, text="📄 选择文件 (支持多选)", command=self.select_files, width=22).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(btn_frame, text="📁 选择文件夹 (自动扫描)", command=self.select_folder, width=24).pack(side=tk.LEFT, padx=0)
+        ttk.Button(btn_frame, text="🗑️ 清空日志", command=self.clear_log, width=12).pack(side=tk.RIGHT)
 
-        # 日志显示区
-        self.log_area = scrolledtext.ScrolledText(root, state='disabled', font=("Consolas", 10))
-        self.log_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # 3. 拖拽提示区 (美化)
+        self.drop_frame = tk.Frame(main_frame, bg="#e1f5fe", highlightbackground="#81d4fa", highlightcolor="#81d4fa", highlightthickness=2, bd=0)
+        self.drop_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        self.drop_label = tk.Label(
+            self.drop_frame, 
+            text="👇 将 角色卡文件 或 文件夹 拖拽到此处 👇", 
+            bg="#e1f5fe", fg="#0277bd", 
+            font=("Microsoft YaHei", 14, "bold"), 
+            height=3
+        )
+        self.drop_label.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
 
-        # 底部状态栏
-        self.status_var = tk.StringVar(value="就绪")
-        tk.Label(root, textvariable=self.status_var, bd=1, relief=tk.SUNKEN, anchor=tk.W).pack(side=tk.BOTTOM, fill=tk.X)
+        # 4. 进度条
+        self.progress_var = tk.DoubleVar()
+        self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var, maximum=100, mode='determinate')
+        self.progress_bar.pack(fill=tk.X, pady=(0, 10))
 
-        # --- 绑定拖拽事件 ---
-        # 注册拖拽目标
+        # 5. 日志显示区
+        log_frame = ttk.LabelFrame(main_frame, text=" 📝 处理日志 ", padding=5)
+        log_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        self.log_area = scrolledtext.ScrolledText(log_frame, state='disabled', font=("Consolas", 10), bg="#f8f9fa", fg="#212529")
+        self.log_area.pack(fill=tk.BOTH, expand=True)
+
+        # 6. 底部状态栏
+        self.status_var = tk.StringVar(value="准备就绪。请选择文件或直接拖拽入窗口。")
+        status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, padding=(10, 2), font=('Microsoft YaHei', 9))
+        status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # 绑定拖拽事件 (绑定到 Frame 和 Label 以确保都能响应)
+        self.drop_frame.drop_target_register(DND_FILES)
+        self.drop_frame.dnd_bind('<<Drop>>', self.on_drop)
         self.drop_label.drop_target_register(DND_FILES)
         self.drop_label.dnd_bind('<<Drop>>', self.on_drop)
-        
-        # 额外绑定：防呆设计，有些系统拖拽到子控件上不响应，绑定到root更稳妥
-        # 但tkinterdnd2通常需要显式注册控件，这里主要优化数据处理逻辑
 
-    def log(self, message):
+    # --- 目录与辅助操作 ---
+    def ensure_output_dir(self):
+        try:
+            target_dir = self.output_dir.get()
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir)
+        except Exception as e:
+            messagebox.showerror("错误", f"无法创建输出目录: {e}")
+
+    def change_output_dir(self):
+        folder = filedialog.askdirectory(title="选择新的输出文件夹")
+        if folder:
+            self.output_dir.set(folder)
+            self.ensure_output_dir()
+            self.log_safe(f"[系统] 输出目录已更改为: {folder}")
+
+    def open_output_dir(self):
+        folder = self.output_dir.get()
+        if os.path.exists(folder):
+            os.startfile(folder)
+        else:
+            messagebox.showwarning("提示", "输出目录目前不存在！")
+
+    def log_safe(self, message):
         """线程安全的日志输出"""
         def _log():
             self.log_area.config(state='normal')
@@ -68,72 +147,62 @@ class CharacterCardExtractor:
             self.log_area.config(state='disabled')
         self.root.after(0, _log)
 
+    def set_status_safe(self, message, progress=None):
+        """线程安全的状态栏和进度条更新"""
+        def _update():
+            self.status_var.set(message)
+            if progress is not None:
+                self.progress_var.set(progress)
+        self.root.after(0, _update)
+
     def clear_log(self):
         self.log_area.config(state='normal')
         self.log_area.delete(1.0, tk.END)
         self.log_area.config(state='disabled')
 
+    # --- 交互事件处理 ---
     def select_files(self):
-        """选择文件对话框"""
+        if self.is_processing: return
         files = filedialog.askopenfilenames(
             title="选择角色卡文件",
-            filetypes=[("图片文件", "*.png *.webp"), ("所有文件", "*.*")]
+            filetypes=[("图片文件", "*.png *.webp *.jpg *.jpeg"), ("所有文件", "*.*")]
         )
-        if files:
-            self.start_processing(list(files))
+        if files: self.start_processing(list(files))
 
     def select_folder(self):
-        """选择文件夹对话框"""
+        if self.is_processing: return
         folder = filedialog.askdirectory(title="选择包含角色卡的文件夹")
-        if folder:
-            self.start_processing([folder])
+        if folder: self.start_processing([folder])
 
     def on_drop(self, event):
-        """处理拖拽事件 - 增强路径清洗逻辑"""
-        # 获取原始路径数据
+        if self.is_processing: return
         raw_data = event.data
-        
-        # 修复Bug：Windows下路径可能包含大括号 {} 且被转义
-        # tkinterdnd2 在 Windows 上有时返回 {C:/path} 格式
-        paths = []
-        
-        # 这里的 splitlist 已经处理了大部分分割，但在 Windows 路径含空格时可能有坑
-        # 我们手动清洗一下
         try:
-            # 尝试使用 tk 的内置分割
-            split_paths = self.root.tk.splitlist(raw_data)
-            for p in split_paths:
-                # 去除首尾可能存在的花括号
-                p_clean = p.strip()
-                if p_clean.startswith('{') and p_clean.endswith('}'):
-                    p_clean = p_clean[1:-1]
-                paths.append(p_clean)
-        except Exception as e:
-            self.log(f"拖拽数据解析异常: {e}")
-            # 简单的备用分割
+            paths = self.root.tk.splitlist(raw_data)
+        except Exception:
             paths = [raw_data.strip('{}')]
+            
+        clean_paths = [p.strip('{}') for p in paths]
+        if clean_paths:
+            self.start_processing(clean_paths)
 
-        if paths:
-            # 打印解析出的路径以便调试
-            self.log(f"接收到拖拽: {len(paths)} 个目标")
-            self.start_processing(paths)
-
+    # --- 核心处理逻辑 ---
     def start_processing(self, targets):
-        """启动处理线程，防止界面卡死"""
-        self.status_var.set("正在处理中...")
+        self.is_processing = True
+        self.progress_var.set(0)
+        self.ensure_output_dir()
+        
+        # 启动后台线程处理
         thread = threading.Thread(target=self.process_targets, args=(targets,))
         thread.daemon = True
         thread.start()
 
     def process_targets(self, targets):
-        """处理文件/文件夹列表"""
         all_files = []
         
-        # 1. 收集所有文件路径
+        self.set_status_safe("正在扫描文件...")
         for path in targets:
-            if not path:
-                continue
-            
+            if not path: continue
             if os.path.isfile(path):
                 all_files.append(path)
             elif os.path.isdir(path):
@@ -141,139 +210,163 @@ class CharacterCardExtractor:
                     for file in files:
                         all_files.append(os.path.join(root, file))
         
-        # 过滤非图片文件
-        valid_files = [f for f in all_files if f.lower().endswith(('.png', '.webp'))]
+        # 过滤图片
+        valid_files = [f for f in all_files if f.lower().endswith(('.png', '.webp', '.jpg', '.jpeg'))]
+        total = len(valid_files)
         
         if not valid_files:
-            self.log("未发现 .png 或 .webp 文件。")
-            self.status_var.set("就绪")
+            self.log_safe("⚠️ 未发现支持的图片文件(.png, .webp, .jpg)。")
+            self.set_status_safe("就绪", 0)
+            self.is_processing = False
             return
 
-        self.log(f"发现 {len(valid_files)} 个图片文件待解析...")
-
+        self.log_safe(f"🚀 开始处理，共发现 {total} 个图片文件...")
         success_count = 0
         fail_count = 0
+        out_folder = self.output_dir.get()
 
-        # 2. 逐个提取
-        for file_path in valid_files:
+        for index, file_path in enumerate(valid_files):
+            filename = os.path.basename(file_path)
             try:
                 result = self.extract_metadata(file_path)
                 if result:
-                    # 保存文件
-                    base_name = os.path.splitext(os.path.basename(file_path))[0]
-                    # 清理文件名中的非法字符
-                    safe_name = "".join([c for c in base_name if c.isalnum() or c in (' ', '_', '-', '(', ')')]).strip()
-                    if not safe_name: safe_name = "Unnamed_Character"
+                    # 提取角色名字 (如果JSON里有name字段，优先用name，否则用文件名)
+                    chara_name = result.get("data", {}).get("name") or result.get("name", "")
                     
-                    out_file = os.path.join(OUTPUT_DIR, f"{safe_name}.json")
+                    base_name = os.path.splitext(filename)[0]
+                    # 清理文件名非法字符
+                    safe_name = re.sub(r'[\\/*?:"<>|]', "", chara_name if chara_name else base_name).strip()
+                    if not safe_name: safe_name = "未命名角色"
                     
-                    # 防止覆盖，添加序号
+                    out_file = os.path.join(out_folder, f"{safe_name}.json")
+                    
+                    # 查重命名
                     counter = 1
                     while os.path.exists(out_file):
-                        out_file = os.path.join(OUTPUT_DIR, f"{safe_name}_{counter}.json")
+                        out_file = os.path.join(out_folder, f"{safe_name}_{counter}.json")
                         counter += 1
                     
                     with open(out_file, 'w', encoding='utf-8') as f:
                         json.dump(result, f, ensure_ascii=False, indent=4)
                     
-                    self.log(f"[成功] {os.path.basename(file_path)} -> {os.path.basename(out_file)}")
+                    self.log_safe(f"✅ [成功] {filename} -> {os.path.basename(out_file)}")
                     success_count += 1
                 else:
-                    self.log(f"[跳过] {os.path.basename(file_path)} (非角色卡或无数据)")
+                    self.log_safe(f"⏭️ [跳过] {filename} (未检测到角色数据)")
                     fail_count += 1
             except Exception as e:
-                self.log(f"[错误] {os.path.basename(file_path)}: {str(e)}")
+                self.log_safe(f"❌ [错误] {filename}: {str(e)}")
                 fail_count += 1
 
-        self.log("-" * 50)
-        self.log(f"处理完成。成功: {success_count}, 失败/跳过: {fail_count}")
-        self.status_var.set("就绪")
+            # 更新进度
+            current_progress = ((index + 1) / total) * 100
+            self.set_status_safe(f"处理中: {index + 1} / {total}", current_progress)
+
+        self.log_safe("-" * 50)
+        self.log_safe(f"🎉 处理完成！成功: {success_count} 张, 跳过/失败: {fail_count} 张")
+        self.set_status_safe("处理完成", 100)
+        self.is_processing = False
+
+    def decode_chara_payload(self, raw_data):
+        """尝试将提取出的字符串/字节解码为JSON"""
+        try:
+            if isinstance(raw_data, bytes):
+                # 如果是字节，先尝试去除末尾/开头的杂项如 NULL 字节
+                raw_data = raw_data.strip(b'\x00')
+                text_content = raw_data.decode('utf-8')
+            else:
+                text_content = str(raw_data)
+
+            # 1. 如果它已经是明文 JSON
+            if text_content.strip().startswith('{'):
+                return json.loads(text_content)
+
+            # 2. 尝试 Base64 解码
+            # 补齐 Padding
+            missing_padding = len(text_content) % 4
+            if missing_padding:
+                text_content += '=' * (4 - missing_padding)
+            
+            decoded_bytes = base64.b64decode(text_content)
+            return json.loads(decoded_bytes.decode('utf-8'))
+        except Exception:
+            return None
 
     def extract_metadata(self, file_path):
-        """从图片中提取角色卡数据 - 增强版解析"""
+        """增强版解析：支持 PNG 文本块、EXIF 以及 底层二进制扫描"""
+        # 方法 A: 使用 Pillow 读取标准的 PNG tEXt 块 或 基本 EXIF
         try:
             with Image.open(file_path) as img:
-                # 确保图像已加载（某些懒加载模式可能导致info为空）
                 img.load()
                 
-                # 获取元数据字典
-                metadata = img.info
+                # 1. 检查标准的 PNG 'chara' 字段
+                if 'chara' in img.info:
+                    parsed = self.decode_chara_payload(img.info['chara'])
+                    if parsed: return parsed
                 
-                if not metadata:
-                    # 如果没有元数据，直接返回
-                    return None
+                # 2. 检查 EXIF 数据 (常用于 WebP 格式的角色卡)
+                exif_data = img.getexif()
+                if exif_data:
+                    # 37510 是 UserComment 的 EXIF Tag ID
+                    user_comment = exif_data.get(37510) 
+                    if user_comment:
+                        # UserComment 有时会带有 'UNICODE\x00' 头
+                        if isinstance(user_comment, bytes) and user_comment.startswith(b'UNICODE\x00'):
+                            user_comment = user_comment[8:]
+                        elif isinstance(user_comment, str) and user_comment.startswith('UNICODE\x00'):
+                            user_comment = user_comment[8:]
+                            
+                        parsed = self.decode_chara_payload(user_comment)
+                        if parsed: return parsed
 
-                # 尝试查找 'chara' 字段
-                # 某些系统的键名可能大小写不同，进行一次遍历查找
-                chara_data = None
-                for key, value in metadata.items():
-                    if key.lower() == 'chara':
-                        chara_data = value
-                        break
-                
-                if not chara_data:
-                    # 深度解析：如果标准字段不存在，尝试寻找所有可能的 Base64 串
-                    # 仅当标准查找失败时启用，防止误判
-                    for key, value in metadata.items():
-                        if isinstance(value, str) and len(value) > 100:
-                            # 尝试解码看看是不是 JSON
-                            try:
-                                # 尝试 Base64 解码
-                                decoded = base64.b64decode(value)
-                                # 检查解码后的内容是否像 JSON
-                                if b'"name"' in decoded or b'"spec"' in decoded:
-                                    chara_data = value
-                                    self.log(f"  > 检测到非标准键名: {key}")
-                                    break
-                            except:
-                                continue
-                
-                if not chara_data:
-                    return None
+                # 3. 遍历 info 中其他可能的大段文本
+                for key, value in img.info.items():
+                    if isinstance(value, str) and len(value) > 100:
+                        parsed = self.decode_chara_payload(value)
+                        if parsed: return parsed
+        except Exception:
+            pass
 
-                # 解码 Base64
-                # 修正 Padding：Base64 字符串长度必须是 4 的倍数
-                # 很多角色卡数据缺少末尾的 '=' 补位，导致解码失败，这是常见的 Bug 来源
-                missing_padding = len(chara_data) % 4
-                if missing_padding:
-                    chara_data += '=' * (4 - missing_padding)
+        # 方法 B: 暴力二进制特征扫描兜底方案 
+        # (处理一些 Pillow 无法正常加载 EXIF 的受损图片或特殊 WebP)
+        try:
+            with open(file_path, 'rb') as f:
+                content = f.read()
                 
-                # 尝试解码
-                decoded_bytes = base64.b64decode(chara_data)
-                
-                # 尝试解析 JSON
-                # 某些旧卡可能是 UTF-16 或其他编码，但绝大多数是 UTF-8
-                text_content = decoded_bytes.decode('utf-8')
-                
-                json_data = json.loads(text_content)
-                
-                # 兼容 V2 卡片结构：
-                # V2 卡片结构为 {"spec": "chara_card_v2", "data": { ... }}
-                # 我们需要提取其中的 data 部分，或者直接返回整个对象
-                # 为了信息完整性，直接返回解析出的整个对象
-                return json_data
+                # 特征1: 明文 JSON 块 
+                # (有些工具会将明文 {"name":"xxx"} 直接存进图片)
+                if b'{"spec"' in content or b'{"name"' in content:
+                    # 使用正则尝试提取 JSON 结构
+                    match = re.search(br'\{.*"name"\s*:.*\}', content, re.DOTALL)
+                    if match:
+                        try:
+                            return json.loads(match.group(0).decode('utf-8'))
+                        except: pass
 
-        except json.JSONDecodeError as e:
-            self.log(f"  > JSON解析失败: {e}")
-            return None
-        except base64.binascii.Error as e:
-            self.log(f"  > Base64解码失败，数据格式错误: {e}")
-            return None
-        except Exception as e:
-            self.log(f"  > 未知解析错误: {e}")
-            return None
+                # 特征2: Base64 特征块 (ey开头是 { 的 Base64)
+                # 寻找形如 eyJ 开头且长度足够长的 Base64 字符串
+                matches = re.finditer(br'(eyJ[a-zA-Z0-9+/=]{100,})', content)
+                for match in matches:
+                    parsed = self.decode_chara_payload(match.group(1))
+                    if parsed and ("name" in str(parsed) or "data" in str(parsed)):
+                        return parsed
+        except Exception:
+            pass
+
+        return None
+
 
 if __name__ == "__main__":
-    # 检查依赖
-    try:
-        from PIL import Image
-        from tkinterdnd2 import TkinterDnD
-    except ImportError as e:
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showerror("缺少依赖", f"运行程序缺少必要的库: {e}\n\n请在终端运行:\npip install Pillow tkinterdnd2")
-        exit(1)
-
+    # 使用 TkinterDnD.Tk 代替默认的 tk.Tk
     root = TkinterDnD.Tk()
+    
+    # 将窗口置于屏幕中央
+    root.update_idletasks()
+    width = 850
+    height = 650
+    x = (root.winfo_screenwidth() // 2) - (width // 2)
+    y = (root.winfo_screenheight() // 2) - (height // 2)
+    root.geometry(f'{width}x{height}+{x}+{y}')
+    
     app = CharacterCardExtractor(root)
     root.mainloop()
