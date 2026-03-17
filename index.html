@@ -66,6 +66,10 @@
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: rgba(148, 163, 184, 0.5);
         }
+        /* 键盘按键样式优化 */
+        kbd {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-purple-500 selection:text-white">
@@ -94,13 +98,28 @@
             <h1 class="text-4xl md:text-5xl font-extrabold mb-6 tracking-tight">
                 高效实用的 <span class="gradient-text">Python 工具集</span>
             </h1>
-            <p class="text-lg md:text-xl text-slate-400 leading-relaxed mb-8">
-                这里收集了我个人使用AI辅助独立开发的一系列自动化脚本与桌面端工具，涵盖音视频处理、图片压缩、文本解析等日常需求。纯粹出于热爱，打造极致的效率体验。
+            <p class="text-lg md:text-xl text-slate-400 leading-relaxed mb-6">
+                这里收集了我个人独立开发的一系列自动化脚本与桌面端工具，涵盖音视频处理、图片压缩、文本解析等日常需求。纯粹出于热爱，打造极致的效率体验。
             </p>
-            <div class="flex flex-wrap justify-center gap-4">
+            <div class="flex flex-wrap justify-center gap-4 mb-8">
                 <span class="px-4 py-1.5 rounded-full bg-blue-900/30 text-blue-300 border border-blue-800/50 text-sm"><i class="fa-solid fa-code mr-2"></i>Python 3</span>
                 <span class="px-4 py-1.5 rounded-full bg-purple-900/30 text-purple-300 border border-purple-800/50 text-sm"><i class="fa-solid fa-window-maximize mr-2"></i>GUI 应用</span>
                 <span class="px-4 py-1.5 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-800/50 text-sm"><i class="fa-solid fa-bolt mr-2"></i>开箱即用</span>
+            </div>
+
+            <!-- 新增：显眼的下载操作提示框 -->
+            <div class="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-5 max-w-2xl mx-auto text-left flex flex-col sm:flex-row items-start sm:items-center gap-4 shadow-lg shadow-blue-900/10 backdrop-blur-sm">
+                <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-400/30">
+                    <i class="fa-solid fa-download text-blue-400 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-blue-300 font-bold mb-1 text-base">💡 如何下载工具代码？</h3>
+                    <p class="text-slate-300 text-sm leading-relaxed">
+                        点击卡片上的【下载】按钮后，浏览器通常会直接打开包含 Python 源码的网页。
+                        请在弹出的代码网页中直接按下键盘 <kbd class="px-2 py-0.5 rounded-md bg-slate-800 border-b-2 border-slate-600 font-semibold text-white mx-1 shadow-sm">Ctrl + S</kbd> 
+                        <span class="text-xs text-slate-400">(Mac: Cmd + S)</span>，即可将其保存为 <code>.py</code> 文件到本地。
+                    </p>
+                </div>
             </div>
         </div>
 
@@ -154,7 +173,7 @@
     <script>
         // 基础 GitHub 仓库路径
         const REPO_BASE = "https://github.com/moshidi244262/Python-Tools/tree/main";
-        // 如果你将来把打包好的 exe 传到了 Releases，可以改这里
+        // 下载的 raw 路径
         const DOWNLOAD_BASE = "https://github.com/moshidi244262/Python-Tools/raw/main";
 
         // 工具数据字典
@@ -355,7 +374,7 @@
             card.appendChild(glow);
 
             card.innerHTML += `
-                <!-- 新增：详细介绍按钮 (绝对定位在右上角) -->
+                <!-- 详细介绍按钮 (绝对定位在右上角) -->
                 <button onclick="openModal('${tool.id}')" class="absolute top-4 right-4 z-20 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-800/80 text-blue-300 hover:bg-blue-600 hover:text-white border border-slate-600 transition-all duration-300 shadow-sm flex items-center group/btn">
                     <i class="fa-solid fa-circle-info mr-1.5 group-hover/btn:rotate-12 transition-transform"></i>详细介绍
                 </button>
@@ -452,7 +471,7 @@
                 `;
             }
 
-            // 新增：构建运行库依赖 HTML
+            // 构建运行库依赖 HTML
             let installHtml = '';
             if (tool.installCmd) {
                 installHtml = `
@@ -532,13 +551,22 @@
                 ${installHtml}
 
                 <!-- 底部按钮 -->
-                <div class="mt-8 flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-700/50">
-                    <a href="${sourceUrl}" target="_blank" class="flex-1 px-5 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors border border-slate-500 flex items-center justify-center text-center">
-                        <i class="fa-brands fa-github mr-2"></i>去 GitHub 查看源码
-                    </a>
-                    <a href="${downloadUrl}" target="_blank" class="flex-1 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors shadow-lg shadow-blue-900/30 flex items-center justify-center text-center">
-                        <i class="fa-solid fa-download mr-2"></i>直接下载该工具脚本
-                    </a>
+                <div class="mt-8 pt-6 border-t border-slate-700/50 relative">
+                    <!-- 新增：弹窗底部的下载操作小提示 -->
+                    <div class="mb-4 text-center">
+                        <p class="text-xs text-slate-400 inline-block bg-slate-800/60 px-3 py-1.5 rounded-full border border-slate-700">
+                            <i class="fa-solid fa-circle-exclamation text-yellow-500 mr-1"></i>
+                            点击下载后如打开纯代码网页，请按 <kbd class="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-600 text-slate-200 mx-0.5 font-mono shadow-inner">Ctrl + S</kbd> 即可保存
+                        </p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <a href="${sourceUrl}" target="_blank" class="flex-1 px-5 py-3 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors border border-slate-500 flex items-center justify-center text-center">
+                            <i class="fa-brands fa-github mr-2"></i>去 GitHub 查看源码
+                        </a>
+                        <a href="${downloadUrl}" target="_blank" class="flex-1 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors shadow-lg shadow-blue-900/30 flex items-center justify-center text-center">
+                            <i class="fa-solid fa-download mr-2"></i>直接下载该工具脚本
+                        </a>
+                    </div>
                 </div>
             `;
 
